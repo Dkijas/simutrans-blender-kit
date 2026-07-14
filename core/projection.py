@@ -160,6 +160,36 @@ def tile_diamond_px(tile_px: int) -> tuple:
     return (tile_px, tile_px // 2)
 
 
+def height_rise_px(tile_height: int, tile_px: int) -> float:
+    """How many SCREEN pixels one height level rises. From the engine, exactly.
+
+    simconst.h:110    #define tile_raster_scale_y(v, rh)  (((v)*(rh)) >> 6)
+    environment.h:22  #define TILE_HEIGHT_STEP (env_t::pak_tile_height_step)
+
+    and settings.cc:1338 reads pak_tile_height_step from the PAKSET's simuconf.tab
+    key `tile_height`. So the .tab number is in 64-pixel units and is scaled to the
+    pakset's own tile width - which is why pak128 says 8 and not 16.
+    """
+    return tile_height * tile_px / 64.0
+
+
+def height_world(tile_height: int, tile_world_size: float = 1.0) -> float:
+    """One height level, in BLENDER units. What a single-slope ramp has to rise.
+
+    Set the pixels this camera draws for a world height dz equal to the pixels the
+    engine draws for one level:
+
+        dz * cos(30) * tile_px / (sqrt(2) * tile_world)  =  tile_height * tile_px / 64
+
+    tile_px cancels, which is the sanity check that this is a property of the
+    pakset and not of the render resolution:
+
+        dz = tile_height * sqrt(2) * tile_world / (64 * cos(30))
+    """
+    return (tile_height / 64.0) * math.sqrt(2.0) * tile_world_size \
+        / math.cos(math.radians(ELEVATION_DEG))
+
+
 # ---------------------------------------------------------------- alignment
 #
 # Where, inside the tile_px x tile_px cell, is the ground at the tile's centre?

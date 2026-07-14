@@ -109,6 +109,37 @@ def test_pakset_makeobj_arg():
     check("pak128 -> 'pak128'", paksets.PAK128.makeobj_arg == "pak128")
 
 
+def test_height_step_is_the_paksets_own():
+    """One height level, and it is NOT the same number for everybody.
+
+    settings.cc:1338 reads `tile_height` out of the PAKSET's simuconf.tab, and
+    simconst.h:110 scales it to the pakset's tile width:
+
+        rise on screen = tile_height * tile_px / 64
+
+    The measured values are pak128's 8 and the demo pakset's 16, and they both come
+    out at sixteen screen pixels: the pakset authors keep the apparent steepness
+    constant and move the .tab number to pay for it. This module used to declare 16
+    for everyone, which would have drawn pak128's ramps at twice the pitch of the
+    pakset they sit in - harmlessly, right up until something read the field.
+    """
+    check("pak128 rises 16 px a level", abs(paksets.PAK128.height_rise_px - 16) < 1e-9,
+          "%.3f" % paksets.PAK128.height_rise_px)
+    check("the demo pakset rises 16 px too",
+          abs(paksets.PAK64.height_rise_px - 16) < 1e-9,
+          "%.3f" % paksets.PAK64.height_rise_px)
+    check("...and they get there from DIFFERENT tile_height values",
+          paksets.PAK128.height_step != paksets.PAK64.height_step)
+
+    # And the world height must be whatever THIS camera has to lift to draw that.
+    for pak in (paksets.PAK64, paksets.PAK128, paksets.PAK256):
+        drawn = projection.project_camera(0.0, 0.0, pak.height_world,
+                                          pak.tile_px, pak.tile_world)[1]
+        check("%s: lifting height_world draws exactly one height level" % pak.name,
+              abs(drawn - pak.height_rise_px) < 1e-6,
+              "%.4f px vs %.4f" % (drawn, pak.height_rise_px))
+
+
 # ---------------------------------------------------------------- directions
 def test_dir_codes_match_engine():
     check("dir order == vehicle_writer.cc",
