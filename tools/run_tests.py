@@ -37,6 +37,9 @@ import threading
 import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+
+from core import paksets                      # noqa: E402  (stdlib only, no bpy)
 
 # Overridable, because nobody else has my directory layout.
 BLENDER = os.environ.get(
@@ -60,6 +63,37 @@ USERDIR128 = os.path.join(ROOT, "build", "sim-userdir128")
 # ordinary thing anyone does to a build directory, silently deleted thirteen tests.
 # They live here now and are copied in before each game suite.
 SCENARIOS = os.path.join(ROOT, "tests", "scenarios")
+
+ADDONS = os.path.join(USERDIR, "addons", "pak")
+ADDONS128 = os.path.join(USERDIR128, "addons", "pak128")
+
+# THE LOOP.
+#
+# Every object a game scenario asks for, and the .dat this run rendered it from.
+#
+# Until this table existed there was no path at all from a render to a .pak the
+# game loads. The .pak files in the addons directories had been copied there by
+# hand, once; the Blender suites wrote their .dat and sheets into build/<dir>/ and
+# stopped. So a full run could be ALL GREEN against art that was a day old, and a
+# regression in the renderer could not turn a single game suite red.
+#
+# It was not hypothetical. A stale CiviaS465.pak sat in the pak128 addons folder
+# declaring the same object names as the freshly built civia465_*.pak beside it,
+# and nothing said which one the engine answered with.
+#
+#     (.dat, relative to build/) (pakset makeobj is told) (name it installs as)
+PAK_BUILDS = (
+    (("demo", "bkitloco.dat"),      "pak64",  "bkitloco.pak"),
+    (("house", "bkithouse.dat"),    "pak128", "bkithouse.pak"),
+    (("way", "bkitroad.dat"),       "pak128", "bkitroad.pak"),
+    (("infra", "bkitwire.dat"),     "pak128", "bkitwire.pak"),
+    (("infra", "bkitsignal.dat"),   "pak128", "bkitsignal.pak"),
+    (("demo_all", "bkloco.dat"),    "pak64",  "bkall_bkloco.pak"),
+    (("demo_all", "bkhouse.dat"),   "pak64",  "bkall_bkhouse.pak"),
+    (("demo_all", "bkroad.dat"),    "pak64",  "bkall_bkroad.pak"),
+    (("demo_all", "bksignal.dat"),  "pak64",  "bkall_bksignal.pak"),
+    (("demo_all", "bkwire.dat"),    "pak64",  "bkall_bkwire.pak"),
+)
 
 # The engine's own distress signals, taken from tools/run-automated-tests.sh.
 # Without these a broken script just... never prints its sentinel, and we would
@@ -140,12 +174,14 @@ def suite_schema():
     return r
 
 
-def _blender(script, sentinel, extra=()):
+def _blender(script, sentinel, extra=(), script_args=()):
     if not os.path.exists(BLENDER):
         return Result(script, False, "Blender not found at %s (set SIMUTRANS_BLENDER)"
                       % BLENDER, skipped=True)
     cmd = [BLENDER, "--background"] + list(extra) + \
           ["--python", os.path.join("tests", script)]
+    if script_args:
+        cmd += ["--"] + list(script_args)    # Blender passes these on to the script
     return _run(cmd, ROOT, sentinel, (r"_FAILED", r"Traceback"), 900, script)
 
 
@@ -160,6 +196,73 @@ def suite_blender_alignment():
 def suite_blender_addon():
     # --factory-startup or the already-enabled add-on shadows the one we install
     return _blender("blender_addon.py", r"\bADDON_OK\b", extra=["--factory-startup"])
+
+
+def suite_demo_loco():
+    """The switcher the first two game suites actually ask for, rendered here."""
+    return _blender("../examples/demo_loco.py", "DEMO_OK")
+
+
+def suite_asset_civia():
+    """The Civia S/465, built through the add-on's own buttons. Installs its .pak."""
+    return _blender("../assets/civia_465/blender/build.py", "CIVIA465_OK",
+                    extra=("--factory-startup",), script_args=("all",))
+
+
+def suite_asset_metro9k():
+    """The Metro 9000, likewise. Installs its .pak into the pak128 addons dir."""
+    return _blender("../assets/metro9k/blender/build.py", "METRO9K_OK",
+                    extra=("--factory-startup",), script_args=("all",))
+
+
+def suite_paks():
+    """Compile the .pak the game suites load, from the art THIS RUN rendered.
+
+    Wipes first. A .pak left behind by an earlier run is an object the engine will
+    load without comment, and a scenario that passes on yesterday's art is not a
+    test of today's code.
+
+    makeobj returning zero is not the proof - it exits zero on plenty of things
+    that will not load. The proof is the game suites that come after this one.
+    """
+    start = time.time()
+    if not os.path.isfile(MAKEOBJ):
+        return Result("paks", False, "makeobj not found: %s (build it: cmake --build"
+                                     " build --target makeobj)" % MAKEOBJ)
+
+    wiped = 0
+    for addons in (ADDONS, ADDONS128):
+        os.makedirs(addons, exist_ok=True)
+        for entry in os.listdir(addons):
+            if entry.endswith(".pak"):
+                os.remove(os.path.join(addons, entry))
+                wiped += 1
+
+    for parts, pakset, installed in PAK_BUILDS:
+        dat = os.path.join(ROOT, "build", *parts)
+        if not os.path.exists(dat):
+            return Result("paks", False, "no %s - did its producer suite run?"
+                          % os.path.join(*parts), time.time() - start)
+
+        out = os.path.dirname(dat)
+        pak = os.path.splitext(dat)[0] + ".pak"
+        # in the .dat's own directory: its image references are relative to it
+        proc = subprocess.run(
+            [MAKEOBJ, paksets.get(pakset).makeobj_arg,
+             os.path.basename(pak), os.path.basename(dat)],
+            cwd=out, capture_output=True, text=True, errors="replace")
+
+        if proc.returncode != 0 or not os.path.exists(pak) or not os.path.getsize(pak):
+            tail = (proc.stdout + proc.stderr).strip().splitlines()
+            return Result("paks", False, "makeobj failed on %s: %s"
+                          % (os.path.join(*parts),
+                             tail[-1] if tail else "exit %d" % proc.returncode),
+                          time.time() - start)
+
+        shutil.copy2(pak, os.path.join(ADDONS, installed))
+
+    return Result("paks", True, "wiped %d stale, built %d from this run's art"
+                  % (wiped, len(PAK_BUILDS)), time.time() - start)
 
 
 def _stage_scenarios(pakname, userdir):
@@ -320,6 +423,10 @@ SUITES = {
     "addon": suite_blender_addon,
     "panel": suite_blender_panel,
     "demo-all": suite_demo_all,
+    "demo-loco": suite_demo_loco,
+    "paks": suite_paks,
+    "asset-civia": suite_asset_civia,
+    "asset-metro9k": suite_asset_metro9k,
     "catalogue": suite_game_catalogue,
     "running": suite_game_running,
     "house": suite_game_house,
@@ -331,10 +438,19 @@ SUITES = {
     "game-metro9k": suite_game_metro9k,
     "game-metro9k-line": suite_game_metro9k_line,
 }
-ORDER = ("core", "schema", "e2e", "alignment", "building", "footprint", "way",
-         "infra", "addon", "panel", "demo-all", "catalogue", "running", "house",
-         "road", "game-infra", "game-all", "civia", "game-civia",
-         "game-metro9k", "game-metro9k-line")
+# Producers first, then the .pak they feed, then the game. The order IS the loop:
+# nothing downstream of "paks" can pass on art that this run did not render.
+ORDER = ("core", "schema",
+         # producers: the art and the .dat
+         "e2e", "alignment", "building", "footprint", "way", "infra", "addon",
+         "panel", "demo-all", "demo-loco",
+         # the .pak the game will load, compiled from what was just rendered
+         "paks",
+         # the game, against the demo pakset
+         "catalogue", "running", "house", "road", "game-infra", "game-all",
+         # the game, against a real pakset - these build and install their own
+         "asset-civia", "civia", "asset-metro9k",
+         "game-civia", "game-metro9k", "game-metro9k-line")
 
 
 def main():
