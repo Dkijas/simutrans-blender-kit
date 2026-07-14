@@ -1,0 +1,11 @@
+# Authored on Windows, meant to run on Linux and macOS too. Normalise text in the
+# repository and let each checkout use its own line endings.
+* text=auto
+
+# .sve savegames and .blend scenes are binary containers. Git must not go anywhere
+# near their line endings: a "fixed" CRLF inside a savegame is a corrupt savegame.
+*.sve binary
+*.blend binary
+*.png binary
+*.jpg binary
+*.pak binary

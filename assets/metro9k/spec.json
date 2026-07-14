@@ -1,0 +1,144 @@
+{
+  "name": "MadridMetro_S9000",
+  "display_name": "Metro de Madrid Serie 9000",
+  "pakset": "pak128",
+
+  "_honesty": [
+    "The art is a STYLISED RECREATION, drawn from a generated side elevation, not a",
+    "tracing of the real vehicle. The numbers below are the real ones, and each says",
+    "where it came from. The README and the forum post must say this out loud.",
+    "",
+    "The figures arrived as a table captioned 'valor recomendado', with no source.",
+    "Three of them were wrong: capacity was given as 1260 (it is 1274), the cars were",
+    "given as a uniform 17.83 m (that is 107/6 - an average wearing a measurement's",
+    "coat; the real bodies are 18.425 and 16.880 m), and the weight was not published",
+    "by anyone, so it is a guess and is marked as one."
+  ],
+
+  "facts": {
+    "speed": {
+      "value": 110,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Series_7000_y_9000 - velocidad maxima 110 km/h"
+    },
+    "power_per_motor_kw": {
+      "value": 198,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Series_7000_y_9000 - '198 kW x 8 o 16'"
+    },
+    "motors": {
+      "value": 16,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Series_7000_y_9000 - the 16-motor variant; there is also an 8-motor one at half the power"
+    },
+    "power_total_kw": {
+      "value": 3168,
+      "kind": "derived",
+      "formula": "power_per_motor_kw * motors = 198 * 16",
+      "source": "power_per_motor_kw, motors"
+    },
+    "seated": {
+      "value": 178,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Series_7000_y_9000 - '178 sentadas'"
+    },
+    "standing": {
+      "value": 1096,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Series_7000_y_9000 - '1096 de pie'"
+    },
+    "capacity_total": {
+      "value": 1274,
+      "kind": "derived",
+      "formula": "seated + standing = 178 + 1096",
+      "source": "seated, standing",
+      "note": "the table we were handed said 1260. It is 1274, and nobody would ever have noticed."
+    },
+    "intro_year": {
+      "value": 2006,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Series_7000_y_9000 - in service 2006"
+    },
+    "length_total_m": {
+      "value": 107.0,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Series_7000_y_9000 - '107 m (6 coches)'"
+    },
+    "length_cab_car_m": {
+      "value": 18.425,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Series_7000_y_9000 - 'longitud de las cajas de 18.425 para los coches motores con cabina'"
+    },
+    "length_intermediate_m": {
+      "value": 16.88,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Series_7000_y_9000 - '16.880 para los motores y remolques'",
+      "note": "NOT the 17.83 m we were handed. That number is 107/6 - an average, not a measurement."
+    },
+    "width_m": {
+      "value": 2.8,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Series_7000_y_9000 - ancho de caja 2,8 m (2808 mm)"
+    },
+    "height_m": {
+      "value": 3.65,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Series_7000_y_9000 - 3,65 m. The article body also gives 3.870 mm as a MAXIMUM, which will be over roof equipment."
+    },
+    "voltage_v": {
+      "value": 1500,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Series_7000_y_9000 - 1500 Vcc, monotension, first subseries (line 7)"
+    },
+
+    "length_carunits": {
+      "value": 8,
+      "kind": "derived",
+      "formula": "the real cars differ by only 9% (18.425 vs 16.880 m), far below the 1-carunit quantum, so they round to the same length - and equal lengths make every joint (L_prev - L_this)/2 exactly zero",
+      "source": "simconvoi.cc:428, core/convoy.py, length_cab_car_m, length_intermediate_m",
+      "note": "unlike the Civia, this is not a compromise. Here the prototype really does have near-equal cars."
+    },
+
+    "weight_total_t": {
+      "value": 200,
+      "kind": "provisional",
+      "source": "a guess. AnsaldoBreda does not publish the mass of the 9000 and no source we found states it. Balance it before anyone plays with it."
+    },
+    "cost": {
+      "value": 2200000,
+      "kind": "provisional",
+      "source": "a guess, in cents"
+    },
+    "runningcost": {
+      "value": 210,
+      "kind": "provisional",
+      "source": "a guess, per km"
+    },
+
+    "window_colour": {
+      "value": "#57656F",
+      "kind": "engine",
+      "source": "display/simgraph16.cc:416 display_day_lights[0] -> #D3C380 at night"
+    },
+    "headlight_colour": {
+      "value": "#E3E3FF",
+      "kind": "engine",
+      "source": "display/simgraph16.cc:416 display_day_lights[10] -> #FFFFE3 at night"
+    }
+  },
+
+  "reference": {
+    "cab": "references/cab.png",
+    "intermediate": "references/intermediate.png",
+    "note": "generated side elevations. NOT orthographic (the camera sits slightly above - the top face of the roof is visible) and NOT flat-shaded, so use them for PROPORTIONS and take absolute sizes from the facts above."
+  },
+
+  "cars": [
+    {"key": "cab_a",  "role": "M", "cab": true,  "panto": true,  "reversed": false},
+    {"key": "int_r1", "role": "R", "cab": false, "panto": false, "reversed": false},
+    {"key": "int_s1", "role": "S", "cab": false, "panto": false, "reversed": false},
+    {"key": "int_s2", "role": "S", "cab": false, "panto": false, "reversed": false},
+    {"key": "int_r2", "role": "R", "cab": false, "panto": false, "reversed": false},
+    {"key": "cab_b",  "role": "M", "cab": true,  "panto": true,  "reversed": true}
+  ]
+}

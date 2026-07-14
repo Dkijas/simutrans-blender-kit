@@ -1,0 +1,109 @@
+{
+  "name": "CiviaS465",
+  "pakset": "pak128",
+
+  "facts": {
+    "speed": {
+      "value": 120,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Civia - Renfe serie 465",
+      "note": "the AI infographic said 140. It was wrong, and it did not sound wrong."
+    },
+    "power_total_kw": {
+      "value": 2200,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Civia - Renfe serie 465",
+      "note": "the AI infographic said 2000."
+    },
+    "weight_total_t": {
+      "value": 157.3,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Civia - Renfe serie 465"
+    },
+    "capacity_total": {
+      "value": 997,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Civia - Renfe serie 465, 277 seated"
+    },
+    "intro_year": {
+      "value": 2004,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Civia - in service since 2004",
+      "note": "the AI infographic said 2009."
+    },
+    "length_total_m": {
+      "value": 98.05,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Civia - five-car 465"
+    },
+    "height_m": {
+      "value": 4.265,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Civia"
+    },
+    "width_m": {
+      "value": 2.94,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Civia"
+    },
+
+    "drawing_height_to_rail_m": {
+      "value": 4.14,
+      "kind": "reference",
+      "source": "civia-elevation.png sha256 9fab1d35bc8fb7dfb1c923cd47b3b3c91381e04534abd2d1ae2f2ee39d11e870, scaled by length_total_m",
+      "note": "3% under the published 4.265: the 50%-coverage roofline cuts the crown off a curved roof. The drawing is trustworthy for PROPORTIONS, and the published figure is the one to build to."
+    },
+    "drawing_aspect": {
+      "value": 18.11,
+      "kind": "reference",
+      "source": "civia-elevation.png sha256 9fab1d35bc8fb7dfb1c923cd47b3b3c91381e04534abd2d1ae2f2ee39d11e870",
+      "note": "bounding box, so it includes the raised pantograph"
+    },
+
+    "power_per_powered_car_kw": {
+      "value": 550,
+      "kind": "derived",
+      "formula": "power_total_kw / 4 powered ends = 2200 / 4",
+      "source": "power_total_kw",
+      "note": "Renfe does not publish the per-car split. Approximate, and it says so."
+    },
+    "length_carunits": {
+      "value": 8,
+      "kind": "derived",
+      "formula": "every car the same, so every joint (L_prev - L_this)/2 is zero - see core/convoy.py",
+      "source": "simconvoi.cc:428 + vehicle_base.cc:338",
+      "note": "NOT because 'pak128 always uses 8'. It does not: 425 of its 505 rail vehicles do, and 80 do not."
+    },
+
+    "window_colour": {
+      "value": "#57656F",
+      "kind": "engine",
+      "source": "display/simgraph16.cc:416 display_day_lights[0] -> #D3C380 at night",
+      "note": "one count away from this and the windows never light, and nothing tells you why"
+    },
+    "headlight_colour": {
+      "value": "#E3E3FF",
+      "kind": "engine",
+      "source": "display/simgraph16.cc:416 display_day_lights[10] -> #FFFFE3 at night"
+    },
+
+    "cost": {
+      "value": 1800000,
+      "kind": "provisional",
+      "source": "a guess, in cents. A vehicle needs a price; nobody measured this one. Balance it against pak128's own stock before anyone plays with it."
+    },
+    "runningcost": {
+      "value": 190,
+      "kind": "provisional",
+      "source": "a guess, per km. Same as cost."
+    }
+  },
+
+  "cars": [
+    {"key": "cab_a",       "cab": true,  "panto": false, "reversed": false},
+    {"key": "int_1",       "cab": false, "panto": false, "reversed": false},
+    {"key": "int_panto",   "cab": false, "panto": true,  "reversed": false},
+    {"key": "int_3",       "cab": false, "panto": false, "reversed": false},
+    {"key": "cab_b",       "cab": true,  "panto": false, "reversed": true}
+  ]
+}

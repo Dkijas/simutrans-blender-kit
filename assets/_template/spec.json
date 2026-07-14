@@ -1,0 +1,93 @@
+{
+  "_readme": [
+    "COPY THIS, FILL IT IN, AND THE BUILD WILL EITHER ACCEPT IT OR TELL YOU WHY NOT.",
+    "",
+    "Every number needs a `kind` and a `source`. The kinds are:",
+    "  measured     a URL, a book, a works drawing - something a person can go and check",
+    "  reference    a pixel measurement of an image (tools/refmeasure.py fills these in)",
+    "  engine       a file:line in the Simutrans source",
+    "  derived      arithmetic over other facts here, with the formula written down",
+    "  provisional  a guess. It BUILDS, and every report names it as a guess.",
+    "",
+    "A number with no source does not reach the .dat. A source of 'chatgpt', 'ai',",
+    "'obvious' or 'typical' is refused by name. If you invented the vehicle, then YOU",
+    "are the source: say kind='provisional' and write 'my design decision' - that is",
+    "honest, and it builds. What is not allowed is a number that LOOKS researched and",
+    "is not, because that is the one kind of mistake nothing downstream can catch."
+  ],
+
+  "name": "MyVehicle",
+  "pakset": "pak128",
+
+  "facts": {
+    "speed": {
+      "value": 0,
+      "kind": "measured",
+      "source": "URL, or 'provisional' + 'my design decision'"
+    },
+    "power_total_kw": {
+      "value": 0,
+      "kind": "measured",
+      "source": ""
+    },
+    "weight_total_t": {
+      "value": 0,
+      "kind": "measured",
+      "source": ""
+    },
+    "capacity_total": {
+      "value": 0,
+      "kind": "measured",
+      "source": ""
+    },
+    "intro_year": {
+      "value": 1900,
+      "kind": "measured",
+      "source": ""
+    },
+    "length_total_m": {
+      "value": 0,
+      "kind": "measured",
+      "source": "the one number that turns the reference image into metres"
+    },
+    "height_m": {
+      "value": 0,
+      "kind": "measured",
+      "source": ""
+    },
+    "width_m": {
+      "value": 0,
+      "kind": "measured",
+      "source": ""
+    },
+
+    "length_carunits": {
+      "value": 8,
+      "kind": "derived",
+      "formula": "all cars equal, so every joint (L_prev - L_this)/2 is zero",
+      "source": "simconvoi.cc:428 - see core/convoy.py before changing this"
+    },
+
+    "cost": {
+      "value": 1000000,
+      "kind": "provisional",
+      "source": "a guess, in cents - balance it against the pakset's own stock"
+    },
+    "runningcost": {
+      "value": 100,
+      "kind": "provisional",
+      "source": "a guess, per km"
+    }
+  },
+
+  "reference": {
+    "image": "references/side-elevation.png",
+    "note": "run: blender --background --factory-startup --python tools/refmeasure.py -- <image> --length <length_total_m>"
+  },
+
+  "cars": [
+    {"key": "cab_a",  "cab": true,  "panto": false, "reversed": false},
+    {"key": "int_1",  "cab": false, "panto": true,  "reversed": false},
+    {"key": "cab_b",  "cab": true,  "panto": false, "reversed": true}
+  ]
+}

@@ -1,0 +1,36 @@
+# Derived. Everything here is reproducible from the sources next to it.
+#
+# build/ is 573 MB: the headless engine, the pak128 testbed, the game roots and
+# every .pak we have ever compiled. It also used to be the only place the test
+# scenarios existed, so `rm -rf build` deleted the tests. They live in
+# tests/scenarios/ now and are copied in.
+build/
+
+# dist/ is written by tools/build_standalone_linter.py and tools/make_figures.py.
+# Ignored deliberately, not by accident: a published artefact that CAN be
+# committed is a published artefact that can go stale without anyone noticing.
+# This one already did - the shipped linter was hours older than its own source.
+# Build it at release time, from a known commit.
+dist/
+
+# Written by assets/*/blender/build.py. The sprite sheets are the important
+# entry here: Blender's metadata stamp wrote the author's absolute path into
+# every one of them. Keeping them out of the history means that cannot be
+# committed even once.
+assets/*/renders/
+assets/*/sprites/
+assets/*/dat/
+assets/*/pak/
+assets/*/reports/
+
+# Reference photographs of real vehicles. Not ignored because they are derived -
+# ignored because we do not own them. This repository is meant to carry a licence,
+# and a licence that covered these would be a false statement about somebody
+# else's photographs.
+assets/refs/
+assets/*/references/
+
+__pycache__/
+*.pyc
+*.pak
+*.zip
