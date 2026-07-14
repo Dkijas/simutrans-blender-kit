@@ -40,18 +40,39 @@ PLAYER_RAMP_GOLD = (
 PLAYER_COLORS = PLAYER_RAMP_BLUE + PLAYER_RAMP_GOLD
 
 # THE LIGHTS. This is how a lit window happens in Simutrans, and it is not a
-# render trick: it is a colour swap. display/simgraph16.cc holds two tables,
-# display_day_lights[] and display_night_lights[], matched EXACTLY, entry for
-# entry; as night falls the engine fades each day colour into its night one.
+# render trick: it is a colour swap. So a train whose windows are painted
+# (87,101,111) glows warm yellow after dark, and one whose windows are painted
+# (86,92,100) - one count away - stays black forever, and nothing tells you why.
 #
-# So a train whose windows are painted (87,101,111) glows warm yellow after dark
-# and one whose windows are painted (86,92,100) - one count away - stays black
-# forever, and nothing anywhere tells you why. The values below are copied from
-# the engine, in order, with the engine's own comments.
+# WHICH TABLE. The engine has TWO, and taking the wrong one is a silent, total
+# failure:
+#
+#   descriptor/image.cc     image_t::rgbtab[]      what MAKEOBJ matches against
+#   display/simgraph16.cc   display_day_lights[]   what the game DRAWS
+#
+# The first column below is rgbtab - the colour the artist must actually PAINT,
+# because image_writer.cc:96 compares each pixel against rgbtab and nothing else.
+# Miss it by one and the pixel is compiled as an ordinary colour that will never
+# light up.
+#
+# The two tables agree on fourteen of the fifteen entries, which is why this went
+# unnoticed. They disagree on the purple:
+#
+#     rgbtab            0xFF017F   <- paint this
+#     display_day_light  0xE100E1   <- and the game shows you this
+#
+# This module used to list 0xE100E1 as the colour to paint. Every signal built
+# with the kit compiled its purple lamp as a flat colour, and it never lit.
 #
 # The greys are in the table too, for menu art that must not darken at night;
-# they are listed because hitting one by ACCIDENT on a vehicle is its own bug -
-# a patch of bodywork that refuses to get dark while everything round it does.
+# they are here because hitting one by ACCIDENT on a vehicle is its own bug - a
+# patch of bodywork that refuses to get dark while everything round it does.
+#
+# tests/test_schema_drift.py re-reads both tables out of the engine source and
+# compares them with this one, entry by entry. Copying a table by hand is what
+# caused the bug; the fix is not to copy it more carefully.
+#
+#         paint this (rgbtab)      shown at night           what it is
 LIGHTS = (
     ((0x57, 0x65, 0x6F), (0xD3, 0xC3, 0x80), "dark window, lit yellow at night"),
     ((0x7F, 0x9B, 0xF1), (0x80, 0xC3, 0xD3), "light window, lit blue at night"),
@@ -66,9 +87,13 @@ LIGHTS = (
     ((0xE3, 0xE3, 0xFF), (0xFF, 0xFF, 0xE3), "white by day, yellow by night"),
     ((0xC1, 0xB1, 0xD1), (0xD3, 0xC3, 0x80), "window, lit yellow"),
     ((0x4D, 0x4D, 0x4D), (0xD3, 0xC3, 0x80), "window, lit yellow"),
-    ((0xE1, 0x00, 0xE1), (0xE1, 0x00, 0xE1), "purple signal light"),
+    ((0xFF, 0x01, 0x7F), (0xE1, 0x00, 0xE1), "purple signal light"),
     ((0x01, 0x01, 0xFF), (0x01, 0x01, 0xFF), "blue light"),
 )
+
+# The purple is the one light whose painted colour is not what you see, so the
+# artist needs it by name rather than by counting rows.
+LAMP_PURPLE = LIGHTS[13][0]      # paint 0xFF017F; the game draws 0xE100E1
 
 LIGHT_DAY = {day: (night, what) for day, night, what in LIGHTS}
 

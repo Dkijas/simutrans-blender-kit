@@ -167,6 +167,15 @@ def suite_core():
                 r"\d+ checks passed", (r"^  FAIL", r"Traceback"), 120, "core")
 
 
+def suite_colours():
+    """Does makeobj really recognise the colours we tell the artist to paint?"""
+    r = _run([sys.executable, os.path.join("tests", "test_colours_makeobj.py")], ROOT,
+             "COLOURS_OK", ("COLOURS_FAILED", "Traceback"), 300, "colours")
+    if not r.ok and "COLOURS_SKIP" in r.detail:
+        r.skipped = True
+    return r
+
+
 def suite_schema():
     """Is our copy of the .dat schema still what the engine's writers say?"""
     r = _run([sys.executable, os.path.join("tests", "test_schema_drift.py"), SIMUTRANS_SRC],
@@ -421,6 +430,7 @@ def suite_game_metro9k_line():
 SUITES = {
     "core": suite_core,
     "schema": suite_schema,
+    "colours": suite_colours,
     "e2e": suite_blender_e2e,
     "alignment": suite_blender_alignment,
     "building": suite_blender_building,
@@ -447,7 +457,7 @@ SUITES = {
 }
 # Producers first, then the .pak they feed, then the game. The order IS the loop:
 # nothing downstream of "paks" can pass on art that this run did not render.
-ORDER = ("core", "schema",
+ORDER = ("core", "schema", "colours",
          # producers: the art and the .dat
          "e2e", "alignment", "building", "footprint", "way", "infra", "addon",
          "panel", "demo-all", "demo-loco",
