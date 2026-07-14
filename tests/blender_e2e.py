@@ -23,6 +23,24 @@ PAKSET = "pak128"
 FAILED = []
 
 
+def png_text_chunks(path):
+    """Every tEXt chunk in a PNG, as (keyword, value)."""
+    import struct
+    data = open(path, "rb").read()
+    out = []
+    i = 8                                    # past the signature
+    while i < len(data) - 8:
+        length = struct.unpack(">I", data[i:i + 4])[0]
+        kind = data[i + 4:i + 8]
+        if kind == b"tEXt":
+            key, _, value = data[i + 8:i + 8 + length].partition(b"\x00")
+            out.append((key.decode("latin1"), value.decode("latin1")))
+        if kind == b"IEND":
+            break
+        i += 12 + length                     # len + type + body + crc
+    return out
+
+
 def check(name, cond, detail=""):
     if cond:
         print("  ok   %s" % name)
@@ -74,6 +92,20 @@ def main():
                   "%dx%d alpha=%s" % (w, h, alpha))
         else:
             check("frame %s exists" % code, False, path)
+
+    # Nothing about the machine that rendered it may travel inside a sprite. By
+    # default Blender writes seven tEXt chunks into every PNG, one of which is the
+    # ABSOLUTE PATH of the .blend - so the author's home directory shipped inside
+    # every published sprite. Checked on the bytes, because that is where it was.
+    for code, path in frames:
+        if not os.path.exists(path):
+            continue
+        chunks = png_text_chunks(path)
+        check("frame %s carries no metadata" % code, chunks == [],
+              "; ".join("%s=%s" % kv for kv in chunks))
+        raw = open(path, "rb").read()
+        check("frame %s does not contain a filesystem path" % code,
+              b"Users" not in raw and _ROOT.encode("latin1", "replace") not in raw)
 
     # the camera must be exactly the engine's projection
     cam = bpy.data.objects[rig.CAM_NAME]

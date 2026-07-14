@@ -309,6 +309,21 @@ def build_rig(bpy, pakset_name="pak128", distance=20.0, target=None):
     if hasattr(r, "dither_intensity"):
         r.dither_intensity = 0.0
 
+    # Blender embeds metadata in every PNG it writes: the .blend's ABSOLUTE PATH,
+    # the date, the machine's idea of the time. Sprites get published, so that is
+    # the author's home directory travelling inside somebody else's pakset.
+    #
+    # `use_stamp` is not the switch. That one is "burn the text into the pixels",
+    # and it is already False by default - turning it off changes nothing at all.
+    # The seven that matter (filename, date, time, frame, camera, scene,
+    # render_time) each default to True and are each written to the file.
+    #
+    # Cleared by enumeration rather than by name, so a future Blender that adds an
+    # eighth does not quietly start leaking again.
+    for prop in r.bl_rna.properties:
+        if prop.identifier.startswith("use_stamp") and prop.type == "BOOLEAN":
+            setattr(r, prop.identifier, False)
+
     # CRITICAL for special colours.
     #
     # Blender's default view transform (AgX/Filmic) tone-maps every pixel. A

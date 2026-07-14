@@ -20,6 +20,7 @@ Prints METRO9K_OK.
 
 import os
 import shutil
+import subprocess
 import sys
 
 import bpy
@@ -52,8 +53,19 @@ def check(name, cond, detail=""):
 
 
 def install_addon():
+    """Build the add-on zip from source, then install THAT one.
+
+    It used to install whatever zip happened to be lying in build/. So a fix could
+    be made in addon/, the test suite could go green against it, and the sprites
+    would still come out of an add-on built days earlier - which is exactly what
+    happened: the fix that stops Blender writing the author's home directory into
+    every PNG was in the tree, and the sprites kept leaking it. The zip is derived.
+    Derive it.
+    """
+    subprocess.run([sys.executable, os.path.join(_ROOT, "tools", "build_addon_zip.py")],
+                   check=True)
     if not os.path.exists(ZIP):
-        raise SystemExit("no add-on zip at %s - run tools/build_addon_zip.py" % ZIP)
+        raise SystemExit("tools/build_addon_zip.py produced no %s" % ZIP)
     bpy.ops.preferences.addon_install(filepath=ZIP, overwrite=True)
     bpy.ops.preferences.addon_enable(module="simutrans_blender_kit")
 

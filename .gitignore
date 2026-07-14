@@ -34,3 +34,6 @@ __pycache__/
 *.pyc
 *.pak
 *.zip
+
+# Blender writes a .blend1 backup beside every save. Noise.
+*.blend1
