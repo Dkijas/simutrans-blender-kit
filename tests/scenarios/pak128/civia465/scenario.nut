@@ -6,13 +6,22 @@
 //
 //   1. is the car in the depot catalogue (the very list the depot dialog is built
 //      from)?
-//   2. does the DEPOT assemble the unit the constraints describe? For the full
-//      five-car set that is the whole test: each car has exactly one possible
-//      successor, so one click on the cab must produce five cars in order.
-//   3. and does it MOVE? The unit is electric, so if it covers ground then pak128's
-//      catenary is really feeding pak128's rail and our motor really has power.
+//   2. is it really ELECTRIC? Not "does the .dat say so" - does the engine, having
+//      loaded the .pak, agree that this vehicle needs catenary?
+//   3. does the DEPOT assemble the unit the constraints describe? Each car has
+//      exactly one possible successor, so one click on the cab must produce five
+//      cars IN ORDER.
+//   4. and does it MOVE?
 //
-// It works with whatever is installed: one car (the prototype) or all five.
+// Checks 2 and 3 exist because they did not. This scenario used to print
+//
+//     "the depot assembled 5 car(s) [...], electric, and the unit has moved"
+//
+// where BOTH "5" and "electric" were decoration: the count went into the message
+// and was never compared, and the word "electric" was a string literal. Compiling
+// the whole unit as diesel, and compiling it with no couplings at all so that one
+// click gave a single car, BOTH passed. A scenario that reports a number without
+// asserting it is not testing that number.
 //
 
 map.file = "empty-16x16.sve"
@@ -22,6 +31,10 @@ scenario.author = "simutrans-blender-kit"
 scenario.version = "1"
 
 CAB_A <- "CiviaS465_CabA"
+
+// The real five-car unit, in the order the couplings must produce it.
+UNIT <- ["CiviaS465_CabA", "CiviaS465_Int1", "CiviaS465_IntPanto",
+         "CiviaS465_Int3", "CiviaS465_CabB"]
 
 local result = "not run"
 local convoy = null
@@ -33,6 +46,20 @@ local watching = false
 
 function bad(err) { return (typeof err == "string") && err != "" }
 function fail(why) { result = "CIVIA465_FAIL: " + why; print(result); watching = false }
+
+function names_of(cars)
+{
+	local out = []
+	foreach (v in cars) { out.append(v.get_name()) }
+	return out
+}
+
+function joined(list)
+{
+	local s = ""
+	foreach (i, v in list) { s += (i > 0 ? " " : "") + v }
+	return s
+}
 
 
 function build_everything()
@@ -88,6 +115,15 @@ function build_everything()
 	}
 	if (cab == null) { return fail(CAB_A + " is NOT in the depot list") }
 
+	// --- is it electric? Ask the ENGINE, which has read the compiled .pak, rather
+	//     than trusting the word in our own success message. needs_electrification()
+	//     is true only for a vehicle whose engine_type really came through as
+	//     electric, so this is the check that a diesel .dat cannot survive.
+	if (!cab.needs_electrification()) {
+		return fail(CAB_A + " does not need catenary - it did not come through as"
+			+ " an electric vehicle")
+	}
+
 	// --- ONE click on the cab car. The depot follows the chain of single
 	//     successors, so this is also the test of the couplings.
 	local depot = depot_x(2, 8, 0)
@@ -112,13 +148,23 @@ function watch()
 
 	local now = convoy.get_pos()
 	if (now.x != start_pos.x || now.y != start_pos.y) {
-		local cars = convoy.get_vehicles()
-		local names = ""
-		foreach (v in cars) { names += v.get_name() + " " }
-		result = "CIVIA465_OK: the depot assembled " + cars.len() + " car(s) [" + names
-			+ "], electric, and the unit has moved from (" + start_pos.x + ","
-			+ start_pos.y + ") to (" + now.x + "," + now.y
-			+ ") on pak128 rail under pak128 catenary"
+		local names = names_of(convoy.get_vehicles())
+
+		if (names.len() != UNIT.len()) {
+			return fail("one click on the cab gave " + names.len() + " car(s), not "
+				+ UNIT.len() + " - the couplings do not chain: [" + joined(names) + "]")
+		}
+		foreach (i, want in UNIT) {
+			if (names[i] != want) {
+				return fail("car " + i + " is " + names[i] + ", expected " + want
+					+ " - the unit assembles out of order: [" + joined(names) + "]")
+			}
+		}
+
+		result = "CIVIA465_OK: one click assembled the whole " + names.len()
+			+ "-car unit in order [" + joined(names) + "], the engine agrees it is"
+			+ " electric, and it has moved from (" + start_pos.x + "," + start_pos.y
+			+ ") to (" + now.x + "," + now.y + ") on pak128 rail under pak128 catenary"
 		print(result)
 		watching = false
 		return

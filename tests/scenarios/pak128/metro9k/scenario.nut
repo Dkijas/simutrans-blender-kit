@@ -1,27 +1,35 @@
 //
-// THE CIVIA S/465, IN A RUNNING GAME, ON PAK128'S OWN TRACK.
+// THE METRO DE MADRID SERIE 9000, IN A RUNNING GAME, ON PAK128'S OWN TRACK.
 //
 // Not "does the .pak load" - a pak can load and still be unbuyable, or buyable and
-// unable to move. This asks the engine three things it cannot fake:
+// unable to move. This asks the engine four things it cannot fake:
 //
 //   1. is the car in the depot catalogue (the very list the depot dialog is built
 //      from)?
-//   2. does the DEPOT assemble the unit the constraints describe? For the full
-//      five-car set that is the whole test: each car has exactly one possible
-//      successor, so one click on the cab must produce five cars in order.
-//   3. and does it MOVE? The unit is electric, so if it covers ground then pak128's
-//      catenary is really feeding pak128's rail and our motor really has power.
+//   2. is it really ELECTRIC? Not "does the .dat say so" - does the engine, having
+//      loaded the .pak, agree that this vehicle needs catenary?
+//   3. does the DEPOT assemble the unit the constraints describe? Each car has
+//      exactly one possible successor, so one click on the cab must produce six
+//      cars IN ORDER.
+//   4. and does it MOVE?
 //
-// It works with whatever is installed: one car (the prototype) or all five.
+// Checks 2 and 3 exist because they did not. The success line reported the car
+// count and called the unit "electric" - the first was never compared and the
+// second was a string literal. Both a diesel build and a build with no couplings
+// at all (one click, one car) passed.
 //
 
 map.file = "empty-16x16.sve"
 
-scenario.short_description = "Metro9000 S/465 on pak128"
+scenario.short_description = "Metro de Madrid serie 9000 on pak128"
 scenario.author = "simutrans-blender-kit"
 scenario.version = "1"
 
 CAB_A <- "MadridMetro_S9000_CabA"
+
+// The real six-car unit, in the order the couplings must produce it.
+UNIT <- ["MadridMetro_S9000_CabA", "MadridMetro_S9000_R1", "MadridMetro_S9000_S1",
+         "MadridMetro_S9000_S2", "MadridMetro_S9000_R2", "MadridMetro_S9000_CabB"]
 
 local result = "not run"
 local convoy = null
@@ -33,6 +41,20 @@ local watching = false
 
 function bad(err) { return (typeof err == "string") && err != "" }
 function fail(why) { result = "METRO9K_FAIL: " + why; print(result); watching = false }
+
+function names_of(cars)
+{
+	local out = []
+	foreach (v in cars) { out.append(v.get_name()) }
+	return out
+}
+
+function joined(list)
+{
+	local s = ""
+	foreach (i, v in list) { s += (i > 0 ? " " : "") + v }
+	return s
+}
 
 
 function build_everything()
@@ -88,6 +110,15 @@ function build_everything()
 	}
 	if (cab == null) { return fail(CAB_A + " is NOT in the depot list") }
 
+	// --- is it electric? Ask the ENGINE, which has read the compiled .pak, rather
+	//     than trusting the word in our own success message. needs_electrification()
+	//     is true only for a vehicle whose engine_type really came through as
+	//     electric, so this is the check that a diesel .dat cannot survive.
+	if (!cab.needs_electrification()) {
+		return fail(CAB_A + " does not need catenary - it did not come through as"
+			+ " an electric vehicle")
+	}
+
 	// --- ONE click on the cab car. The depot follows the chain of single
 	//     successors, so this is also the test of the couplings.
 	local depot = depot_x(2, 8, 0)
@@ -101,7 +132,7 @@ function build_everything()
 
 	start_pos = convoy.get_pos()
 	watching = true
-	print("CIVIA465: built; watching the unit leave the depot")
+	print("METRO9K: built; watching the unit leave the depot")
 }
 
 
@@ -112,13 +143,23 @@ function watch()
 
 	local now = convoy.get_pos()
 	if (now.x != start_pos.x || now.y != start_pos.y) {
-		local cars = convoy.get_vehicles()
-		local names = ""
-		foreach (v in cars) { names += v.get_name() + " " }
-		result = "METRO9K_OK: the depot assembled " + cars.len() + " car(s) [" + names
-			+ "], electric, and the unit has moved from (" + start_pos.x + ","
-			+ start_pos.y + ") to (" + now.x + "," + now.y
-			+ ") on pak128 rail under pak128 catenary"
+		local names = names_of(convoy.get_vehicles())
+
+		if (names.len() != UNIT.len()) {
+			return fail("one click on the cab gave " + names.len() + " car(s), not "
+				+ UNIT.len() + " - the couplings do not chain: [" + joined(names) + "]")
+		}
+		foreach (i, want in UNIT) {
+			if (names[i] != want) {
+				return fail("car " + i + " is " + names[i] + ", expected " + want
+					+ " - the unit assembles out of order: [" + joined(names) + "]")
+			}
+		}
+
+		result = "METRO9K_OK: one click assembled the whole " + names.len()
+			+ "-car unit in order [" + joined(names) + "], the engine agrees it is"
+			+ " electric, and it has moved from (" + start_pos.x + "," + start_pos.y
+			+ ") to (" + now.x + "," + now.y + ") on pak128 rail under pak128 catenary"
 		print(result)
 		watching = false
 		return

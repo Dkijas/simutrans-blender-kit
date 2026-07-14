@@ -5,6 +5,16 @@
 // cannot prove it is ALIGNED - a loco can be in the catalogue and still float
 // above the rail or sink into it. So build a track, buy the thing, and run it.
 //
+// And then WAIT FOR IT TO RUN, which is the part that was missing. This scenario
+// used to print
+//
+//     "BKITDEMO_OK: BKit_Switcher is running between (4,2) and (4,13)"
+//
+// on the line straight after start_all_convoys() - before the convoy had taken a
+// single step, and without ever asking whether it took one. The two coordinates in
+// that sentence are the SCHEDULE, not the position. A loco that never left the
+// depot passed. The suite that runs this one is called "game:running".
+//
 
 map.file = "empty-16x16.sve"
 
@@ -15,6 +25,10 @@ scenario.version = "1"
 WANTED <- "BKit_Switcher"
 
 local result = "not started"
+local convoy = null
+local start_pos = null
+local polls = 0
+local watching = false
 
 
 function build_demo()
@@ -66,18 +80,43 @@ function build_demo()
 
 	local depot = depot_x(4, 14, 0)
 	depot.append_vehicle(pl, convoy_x(0), loco)
-	local cnv = depot.get_convoy_list()[0]
+	convoy = depot.get_convoy_list()[0]
 	// create_simple_schedule() is a test-harness helper, not part of the API -
 	// build the schedule directly (schedule_entry_x is pos, min load, wait)
-	cnv.change_schedule(pl, schedule_x(wt_rail, [
+	convoy.change_schedule(pl, schedule_x(wt_rail, [
 		schedule_entry_x(coord3d(4, 2, 0), 0, 0),
 		schedule_entry_x(coord3d(4, 13, 0), 0, 0),
 	]))
 	depot.start_all_convoys(pl)
 
-	result = "BKITDEMO_OK: " + WANTED + " is running between (4,2) and (4,13)"
-	print(result)
+	start_pos = convoy.get_pos()
+	watching = true
 	print("BKITDEMO: track = " + rail.get_name() + ", depot = " + depot_desc.get_name())
+	print("BKITDEMO: started; watching the loco leave the depot")
+}
+
+
+// The verdict is movement, and nothing else. Not "the order was accepted", not
+// "the schedule exists" - the convoy has to be somewhere it was not.
+function watch()
+{
+	if (!watching || convoy == null) { return }
+	polls++
+
+	local now = convoy.get_pos()
+	if (now.x != start_pos.x || now.y != start_pos.y) {
+		result = "BKITDEMO_OK: " + WANTED + " has moved from (" + start_pos.x + ","
+			+ start_pos.y + ") to (" + now.x + "," + now.y + ")"
+		print(result)
+		watching = false
+		return
+	}
+	if (polls > 400) {
+		result = "BKITDEMO_FAIL: " + WANTED + " never left the depot in " + polls
+			+ " steps - it is in the catalogue and it does not run"
+		print(result)
+		watching = false
+	}
 }
 
 
@@ -85,8 +124,8 @@ function start()        { build_demo() }
 function resume_game()  { build_demo() }
 
 function get_rule_text(pl)   { return ttext("Watch the loco.") }
-function get_goal_text(pl)   { return ttext("Does it sit on the rail?") }
+function get_goal_text(pl)   { return ttext("Does it sit on the rail, and does it move?") }
 function get_info_text(pl)   { return ttext(result) }
 function get_result_text(pl) { return ttext(result) }
 function is_tool_allowed(pl, tool_id, wt, name) { return true }
-function is_scenario_completed(pl) { return 100 }
+function is_scenario_completed(pl) { watch(); return 0 }
