@@ -30,7 +30,10 @@ _PROJ = os.path.dirname(_HERE)                       # assets/metro9k
 _ROOT = os.path.dirname(os.path.dirname(_PROJ))      # the kit
 
 ZIP = os.path.join(_ROOT, "build", "simutrans_blender_kit.zip")
-MAKEOBJ = os.path.join(_ROOT, "build", "tools", "makeobj.exe")
+sys.path.insert(0, _ROOT)
+from tools import toolchain                   # noqa: E402  (harness, not the add-on)
+
+MAKEOBJ = toolchain.find_makeobj(_ROOT) or ""
 ADDONS = os.path.join(_ROOT, "build", "sim-userdir128", "addons", "pak128")
 
 RENDERS = os.path.join(_PROJ, "renders")

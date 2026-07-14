@@ -26,6 +26,13 @@ import bpy
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
 
+from tools import toolchain                  # noqa: E402
+
+# Resolved HERE, not where it is used. This test takes the checkout back off
+# sys.path on purpose (see build_and_install), so by the time main() runs there is
+# no `tools` package to import any more - and that is the point of the test.
+MAKEOBJ = toolchain.find_makeobj(_ROOT)
+
 from tools import build_addon_zip           # noqa: E402
 
 MODULE = "simutrans_blender_kit"
@@ -147,9 +154,9 @@ def main():
     check("Check Colours runs", bpy.ops.simutrans.check_colors() == {"FINISHED"})
 
     # --- Compile .pak: the button must really produce a .pak ---
-    makeobj = os.path.join(_ROOT, "build", "tools", "makeobj.exe")
-    if not os.path.exists(makeobj):
-        print("  skip Compile .pak (no makeobj at %s)" % makeobj)
+    makeobj = MAKEOBJ
+    if not makeobj:
+        print("  skip Compile .pak (no makeobj found)")
     else:
         # refuses before it is told where makeobj is
         p.makeobj_path = ""

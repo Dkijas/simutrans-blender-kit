@@ -40,18 +40,20 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from core import paksets                      # noqa: E402  (stdlib only, no bpy)
+from tools import toolchain                   # noqa: E402
 
-# Overridable, because nobody else has my directory layout.
-BLENDER = os.environ.get(
-    "SIMUTRANS_BLENDER",
-    r"C:\Program Files\Blender Foundation\Blender 5.1\blender.exe")
+# Found, not assumed. Every one of these used to be a Windows literal, and the
+# Blender one named a specific VERSION - so the suite broke on Linux, on macOS,
+# and on the next Windows machine to install a newer Blender. Each honours an
+# environment variable, because nobody else has this directory layout.
+BLENDER = toolchain.find_blender()
+MAKEOBJ = toolchain.find_makeobj(ROOT)
+HEADLESS = toolchain.find_headless(ROOT)
+
 SIMUTRANS_SRC = os.environ.get(
     "SIMUTRANS_SRC", os.path.join(os.path.dirname(ROOT), "simutrans"))
-
-HEADLESS = os.path.join(ROOT, "build", "sim-headless", "simutrans", "simutrans.exe")
 GAME_BASE = os.path.join(SIMUTRANS_SRC, "simutrans")   # holds config/ and pak/
 USERDIR = os.path.join(ROOT, "build", "sim-userdir")
-MAKEOBJ = os.path.join(ROOT, "build", "tools", "makeobj.exe")
 
 # The pak128 testbed: a real pakset and a game root of our own, both outside the
 # game's repository. See assets/civia_465/README.md.
@@ -175,9 +177,9 @@ def suite_schema():
 
 
 def _blender(script, sentinel, extra=(), script_args=()):
-    if not os.path.exists(BLENDER):
-        return Result(script, False, "Blender not found at %s (set SIMUTRANS_BLENDER)"
-                      % BLENDER, skipped=True)
+    if not BLENDER:
+        return Result(script, False, "no Blender found (put it on PATH, or set"
+                      " SIMUTRANS_BLENDER)", skipped=True)
     cmd = [BLENDER, "--background"] + list(extra) + \
           ["--python", os.path.join("tests", script)]
     if script_args:
@@ -226,9 +228,10 @@ def suite_paks():
     that will not load. The proof is the game suites that come after this one.
     """
     start = time.time()
-    if not os.path.isfile(MAKEOBJ):
-        return Result("paks", False, "makeobj not found: %s (build it: cmake --build"
-                                     " build --target makeobj)" % MAKEOBJ)
+    if not MAKEOBJ:
+        return Result("paks", False, "no makeobj found. Build it from the Simutrans"
+                      " source (cmake --build <dir> --target makeobj), put it on"
+                      " PATH, or set SIMUTRANS_MAKEOBJ")
 
     wiped = 0
     for addons in (ADDONS, ADDONS128):
@@ -286,11 +289,13 @@ def _stage_scenarios(pakname, userdir):
 
 
 def _game(scenario, sentinel, name):
-    for path, what in ((HEADLESS, "headless simutrans (cmake -DSIMUTRANS_BACKEND=none"
-                                  " --target simutrans)"),
-                       (GAME_BASE, "the game's base dir (set SIMUTRANS_SRC)")):
-        if not os.path.exists(path):
-            return Result(name, False, "missing %s: %s" % (what, path), skipped=True)
+    if not HEADLESS:
+        return Result(name, False, "no headless simutrans (cmake"
+                      " -DSIMUTRANS_BACKEND=none --target simutrans, or set"
+                      " SIMUTRANS_HEADLESS)", skipped=True)
+    if not os.path.exists(GAME_BASE):
+        return Result(name, False, "missing the game's base dir (set SIMUTRANS_SRC):"
+                      " %s" % GAME_BASE, skipped=True)
 
     problem = _stage_scenarios("pak", USERDIR)
     if problem:
@@ -380,8 +385,10 @@ def _game128(scenario, sentinel, name):
     addon has to prove itself inside somebody else's pakset, so this one runs
     against pak128 proper, with our .pak in a user addons directory.
     """
-    for path, what in ((HEADLESS, "headless simutrans"),
-                       (GAME128_BASE, "the pak128 game root (see"
+    if not HEADLESS:
+        return Result(name, False, "no headless simutrans (set SIMUTRANS_HEADLESS)",
+                      skipped=True)
+    for path, what in ((GAME128_BASE, "the pak128 game root (see"
                                       " assets/civia_465/README.md)"),
                        (os.path.join(GAME128_BASE, "pak128"), "pak128 itself")):
         if not os.path.exists(path):
