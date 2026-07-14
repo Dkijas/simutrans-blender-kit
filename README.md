@@ -613,4 +613,12 @@ emits the keys, nothing drives them yet), multi-tile vehicles, and buildings.
 
 ## License
 
-Artistic License 1.0, to match Simutrans.
+The code is **MIT** — reuse it however you like, in anything.
+
+Matching Simutrans' own Artistic 1.0 looked like the obvious choice and was the
+wrong one: `addon/` imports `bpy`, which makes it a derivative work of Blender
+and obliges it to be GPL-compatible. Artistic 1.0 is not. MIT is, and it is more
+permissive besides.
+
+The two example trains are modelled on real vehicles and are **not licensed
+yet** — deliberately. Both points are set out in [LICENSING.md](LICENSING.md).
