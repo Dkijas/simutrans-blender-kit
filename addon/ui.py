@@ -359,10 +359,21 @@ def _render(p, out):
     if p.obj_type == "wayobj":
         frames = rig.render_wayobj(bpy, out, p.pakset, basename=p.basename,
                                    align_offset=tuple(p.align_offset))
+
+        # The ramp (collection wayobj_slope). Without it the catenary is not drawn
+        # on a slope at all - wayobj.cc:270, no guard - so the rail climbs the hill
+        # and the wire does not, while the tile stays electrified.
+        slope_frames = ()
+        if rig.has_wayobj_slope_model(bpy):
+            slope_frames = rig.render_wayobj_slopes(
+                bpy, out, p.pakset, basename=p.basename,
+                align_offset=tuple(p.align_offset))
+
         if not p.write_dat:
             return frames, None, None
         png, dat, _pl = rig.build_wayobj_sheet_and_dat(
             frames, out, p.pakset, basename=p.basename, cols=8,
+            slope_frames=slope_frames,
             waytype=p.waytype, own_waytype=p.own_waytype, cost=p.cost,
             maintenance=p.maintenance, topspeed=p.topspeed,
             intro_year=p.intro_year, **common)

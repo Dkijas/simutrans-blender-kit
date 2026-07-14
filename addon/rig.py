@@ -1084,15 +1084,75 @@ def render_wayobj(bpy, out_dir, pakset_name="pak128", basename="wayobj",
     return frames
 
 
+def has_wayobj_slope_model(bpy, prefix=WAYOBJ_COLLECTION_PREFIX):
+    """Did the artist model the catenary on a ramp? -> bool."""
+    return any(col.name == prefix + ways.SLOPE_PIECE for col in bpy.data.collections)
+
+
+def render_wayobj_slopes(bpy, out_dir, pakset_name="pak128", basename="wayobj",
+                         piece_setup=None, distance=20.0,
+                         align_offset=(0.0, 0.0, 0.0)):
+    """A wayobj's four slope images, both layers. -> [((layer, name), path), ...].
+
+    WITHOUT THESE THE CATENARY VANISHES ON EVERY HILL. wayobj.cc:270 goes straight
+    to get_back_slope_image_id(hang) with no guard, exactly as the way does at
+    weg.cc:545 - so the rail climbs the hill and the wire does not, while the tile
+    stays electrified and the train runs on nothing.
+
+    Same shape as the way's ramp: one more collection, wayobj_slope, holding the
+    straight catenary on a north-facing ramp - plus wayobj_slope_front for the parts
+    that belong in front of the train, as everywhere else in a wayobj.
+    """
+    if piece_setup is None:
+        piece_setup = collection_wayobj_setup()
+
+    layers = ways.WAYOBJ_LAYERS if has_front_parts(bpy) else (ways.WAYOBJ_BACK,)
+
+    target = tile_anchor(pakset_name, align_offset)
+    build_rig(bpy, pakset_name, distance, target=target)
+    cam = bpy.data.objects[CAM_NAME]
+    scene = bpy.context.scene
+    out_dir = _prepare_out(out_dir)
+
+    frames = []
+    for layer in layers:
+        piece_setup(bpy, ways.SLOPE_PIECE, layer)
+        for _key, name, turns in ways.slope_plan():
+            az = ways.azimuth_for(turns)
+            cam.rotation_euler = tuple(math.radians(a)
+                                       for a in (projection_rot_x(), 0.0, az))
+            cam.location = _camera_location(distance, az, 30.0, target)
+            aim_sun(bpy, az)
+
+            path = os.path.join(out_dir, "%s_%s_up_%s.png" % (basename, layer, name))
+            scene.render.filepath = path
+            bpy.ops.render.render(write_still=True)
+            frames.append(((layer, name), path))
+
+    warn_if_clipped(frames, "wayobj slope", GROUND_WATCH)
+    return frames
+
+
 def build_wayobj_sheet_and_dat(frames, out_dir, pakset_name="pak128",
-                               basename="wayobj", cols=4, **dat_kwargs):
-    """Assemble the wayobj's sheet and write a compilable .dat next to it."""
+                               basename="wayobj", cols=4, slope_frames=(),
+                               **dat_kwargs):
+    """Assemble the wayobj's sheet and write a compilable .dat next to it.
+
+    The flat images are keyed (layer, ribi) with an int ribi; the slope images
+    (layer, "n"|"w"|"e"|"s"). They share the sheet and are told apart by that.
+    """
     pak = paksets.get(pakset_name)
     out_dir = _prepare_out(out_dir)
     sheet_png = os.path.join(out_dir, "%s.png" % basename)
-    placement = sheet.assemble(frames, pak.tile_px, cols=cols, out_path=sheet_png)
+
+    cells = sheet.assemble(list(frames) + list(slope_frames), pak.tile_px,
+                           cols=cols, out_path=sheet_png)
+
+    placement = {k: v for k, v in cells.items() if isinstance(k[1], int)}
+    up = {k: v for k, v in cells.items() if isinstance(k[1], str)}
 
     block = ways.wayobj_image_block(basename, placement)
+    slopes = ways.wayobj_slope_image_block(basename, up)
     # the icon has to be a BACK image: the front layer of a straight run is a bare
     # wire on transparency, which makes a button nobody can see
     icon_key = (ways.WAYOBJ_BACK, ways.DEFAULT_ICON_RIBI)
@@ -1100,7 +1160,7 @@ def build_wayobj_sheet_and_dat(frames, out_dir, pakset_name="pak128",
     ui = "icon=%s.%d.%d\ncursor=%s.%d.%d" % (basename, r, c, basename, r, c)
 
     dat_text = ways.wayobj_dat(dat_kwargs.pop("name", basename), block, ui,
-                               **dat_kwargs)
+                               slopes=slopes, **dat_kwargs)
     dat_path = os.path.join(out_dir, "%s.dat" % basename)
     with open(dat_path, "w", encoding="utf-8") as f:
         f.write(dat_text)

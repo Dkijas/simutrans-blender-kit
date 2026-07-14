@@ -432,18 +432,68 @@ retire_year={retire_year}
 # Two layers per ribi: back is drawn before the vehicles, front after. The wire
 # that crosses over the train belongs in FRONT, or the train drives over it.
 {images}
+
+# --- slopes ----------------------------------------------------------------
+# WITHOUT THESE THE CATENARY VANISHES ON EVERY HILL, exactly as the way does.
+# wayobj.cc:270 reaches straight for get_back_slope_image_id(hang) with no guard,
+# so a wayobj with no slope images is not drawn on a sloped tile: the rail climbs
+# the hill, the wire does not, and the tile is still electrified.
+#
+# NOTE THE SPELLING. Unlike a way, a wayobj takes ONLY the numeric form -
+# way_obj_writer.cc:78 builds the key with sprintf("frontimageup[%d]", slope) and
+# never looks for frontimageup[n]. n=3, w=6, e=9, s=12.
+#
+# Double-height is optional here too: way_obj_desc.h falls back to the single
+# images when the double ones are absent.
+{slopes}
 """
 
 
 def wayobj_dat(name, images, ui, waytype="track",
                own_waytype="electrified_track", cost=100, maintenance=100,
-               topspeed=999, author="", intro_year=1900, retire_year=2999):
+               topspeed=999, author="", intro_year=1900, retire_year=2999,
+               slopes=""):
     """A compilable wayobj .dat - catenary, third rail, street lamps."""
+    if not slopes:
+        slopes = "# NONE. This wayobj will not be drawn on any slope - see above."
     return _WAYOBJ_SKELETON.format(
         name=name, author=author, waytype=waytype, own_waytype=own_waytype,
         cost=cost, maintenance=maintenance, topspeed=topspeed,
         intro_year=intro_year, retire_year=retire_year, ui=ui, images=images,
+        slopes=slopes,
     )
+
+
+def wayobj_slope_image_block(basename, placement, double=False):
+    """frontimageup[3|6|9|12] / backimageup[...] lines.
+
+    placement: {(layer, slope_name): (row, col)}
+
+    ONLY the numeric spelling: way_obj_writer.cc:78 writes the key with
+    sprintf("frontimageup[%d]", slope) and never looks for a lettered one. That is
+    the opposite of the way writer, which accepts both.
+    """
+    if not placement:
+        return ""
+
+    suffix = "2" if double else ""
+    lines = []
+    for layer in WAYOBJ_LAYERS:
+        present = [d for d in SLOPE_NAMES if (layer, d) in placement]
+        if not present:
+            continue
+        if len(present) != len(SLOPE_NAMES):
+            raise ValueError(
+                "a wayobj needs all four %s slope images per layer or none: %s is "
+                "missing %s" % ("double-height" if double else "single-height",
+                                layer,
+                                ", ".join(d for d in SLOPE_NAMES if d not in present)))
+        for name in SLOPE_NAMES:
+            row, col = placement[(layer, name)]
+            lines.append("%simageup%s[%d]=%s.%d.%d"
+                         % (layer, suffix, SLOPE_LEGACY_CODE[name], basename,
+                            row, col))
+    return "\n".join(lines)
 
 
 def wayobj_image_block(basename, placement):

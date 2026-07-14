@@ -105,6 +105,41 @@ def build_catenary():
             bpy.context.scene.collection.objects.unlink(span)
             front.objects.link(span)
 
+    # --- the ramp. Same story as the way's: wayobj.cc:270 reaches for the slope
+    # image with no guard, so a catenary without one is NOT DRAWN on a hill - the
+    # rail climbs it, the wire does not, and the tile is still electrified.
+    rise = pak.height_world
+    back = bpy.data.collections.new(rig.WAYOBJ_COLLECTION_PREFIX + ways.SLOPE_PIECE)
+    bpy.context.scene.collection.children.link(back)
+    front = bpy.data.collections.new(
+        rig.WAYOBJ_COLLECTION_PREFIX + ways.SLOPE_PIECE + "_front")
+    bpy.context.scene.collection.children.link(front)
+
+    # The mast stands on the raised (south, -Y) side of a north-facing ramp, and it
+    # is exactly as tall as the flat ones. NOTHING in the ramp may be higher than
+    # the flat model, because the flat model already sits close to the top of the
+    # cell: raising the wire by a height level put it clean off the frame, and the
+    # rig's own clipping warning said so before the test did.
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.05 * tw, depth=1.4 * tw,
+                                        location=(-0.4 * tw, -0.4 * tw, 0.7 * tw))
+    mast = bpy.context.active_object
+    mast.name = "mast_slope"
+    mast.data.materials.append(pole_mat)
+    bpy.context.scene.collection.objects.unlink(mast)
+    back.objects.link(mast)
+
+    # the wire follows the ramp DOWNWARDS: level with the flat catenary over the
+    # raised end, one height level below it over the other
+    for sign, drop in ((-1, 0.0), (1, rise)):
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(
+            0.0, sign * 0.25 * tw, 1.3 * tw - drop))
+        span = bpy.context.active_object
+        span.name = "wire_slope_%d" % sign
+        span.scale = (0.06 * tw, 0.5 * tw, 0.03 * tw)
+        span.data.materials.append(wire_mat)
+        bpy.context.scene.collection.objects.unlink(span)
+        front.objects.link(span)
+
 
 def test_catenary():
     pak = paksets.get(PAKSET)
@@ -140,8 +175,20 @@ def test_catenary():
     check("image[-]: nothing to draw in front of an isolated tile",
           opaque_pixels(by_key[(ways.WAYOBJ_FRONT, 0)]) == 0)
 
+    # --- the ramp
+    check("the rig sees the catenary's ramp", rig.has_wayobj_slope_model(bpy))
+    slope_frames = rig.render_wayobj_slopes(bpy, OUT, PAKSET, basename="bkitwire")
+    check("eight slope images: four directions, two layers",
+          len(slope_frames) == 8, str(len(slope_frames)))
+    check("every slope image has something in it",
+          all(opaque_pixels(p) > 0 for _k, p in slope_frames))
+    check("the four back ramps are four different pictures",
+          len({tuple(sheet.read_png(p)[3]) for (lay, _d), p in slope_frames
+               if lay == ways.WAYOBJ_BACK}) == 4)
+
     sheet_png, dat_path, _pl = rig.build_wayobj_sheet_and_dat(
         frames, OUT, PAKSET, basename="bkitwire", cols=8,
+        slope_frames=slope_frames,
         name="BKit_Catenary", waytype="track", own_waytype="electrified_track",
         author="simutrans-blender-kit")
 
@@ -154,6 +201,11 @@ def test_catenary():
     check("dat carries both layers",
           "backimage[ns]=" in dat and "frontimage[ns]=" in dat, dat)
     check("dat carries an icon", "icon=" in dat, dat)
+    # NUMERIC only: way_obj_writer.cc:78 builds the key with sprintf("...[%d]"),
+    # and never looks for a lettered one. n=3, w=6, e=9, s=12.
+    check("dat carries all four slope images, or the wire vanishes on hills",
+          all(("backimageup[%d]=" % n) in dat and ("frontimageup[%d]=" % n) in dat
+              for n in (3, 6, 9, 12)), dat)
 
     findings = schema.lint(dat)
     for f in findings:
