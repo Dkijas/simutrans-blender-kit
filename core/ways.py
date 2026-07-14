@@ -220,11 +220,57 @@ SLOPE_TURNS = {"n": 0, "e": 1, "s": 2, "w": 3}
 DOUBLE_SLOPE_OPTIONAL = True
 
 
+# The seventh and eighth shapes, in the same grammar as the other six: a straight
+# way sitting on a ramp that faces NORTH. Everything else is that model turned.
+SLOPE_PIECE = "slope"
+SLOPE_PIECE_DOUBLE = "slope2"
+
+
 def slope_plan(double=False):
     """-> [(key, name, turns)] for the slope images, in the writer's own order."""
     prefix = "imageup2" if double else "imageup"
     return [("%s[%s]" % (prefix, name), name, SLOPE_TURNS[name])
             for name in SLOPE_NAMES]
+
+
+def slope_image_block(basename, placement, double=False):
+    """imageup[n|w|e|s]=sheet.row.col lines.
+
+    placement: {slope_name: (row, col)}
+
+    ALL FOUR OR NONE, and this refuses anything else rather than emitting it.
+
+    The two halves of the engine disagree about partial lists, and the result is
+    silent and wrong. way_writer.cc:126 only appends a key it actually finds:
+
+        if (!str.empty()) { keys.append(str); }
+
+    but way_desc.h:148 reads the list back BY POSITION - north is entry 0, west 1,
+    east 2, south 3. Hand it imageup[n] and imageup[s] and the list is two entries
+    long: asking for the west image returns the SOUTH picture, and asking for south
+    runs off the end. A way that is merely missing its slopes is invisible on a
+    hill, which is bad; a way with two of the four draws the wrong thing, which is
+    worse, and neither makeobj nor the engine says a word.
+    """
+    if not placement:
+        return ""
+
+    missing_dirs = [d for d in SLOPE_NAMES if d not in placement]
+    if missing_dirs:
+        raise ValueError(
+            "a way needs all four %s slope images or none: %s missing. The engine "
+            "indexes them by position (way_desc.h:148), so a partial set makes it "
+            "hand out the wrong image for the directions that ARE there."
+            % ("double-height" if double else "single-height",
+               ", ".join("imageup%s[%s]" % ("2" if double else "", d)
+                         for d in missing_dirs)))
+
+    prefix = "imageup2" if double else "imageup"
+    lines = []
+    for name in SLOPE_NAMES:
+        row, col = placement[name]
+        lines.append("%s[%s]=%s.%d.%d" % (prefix, name, basename, row, col))
+    return "\n".join(lines)
 
 
 # --- diagonals ---------------------------------------------------------------
@@ -294,18 +340,31 @@ retire_year={retire_year}
 # image[<ribi>] where the ribi is n|e|s|w: north=1 east=2 south=4 west=8, and
 # the engine indexes this list by that mask directly.
 {images}
+
+# --- slopes --------------------------------------------------------------
+# WITHOUT THESE THE WAY IS INVISIBLE ON EVERY HILL. weg.cc:545 calls
+# set_images(image_slope, ...) with no guard at all, so a way with no slope
+# images simply is not drawn on a sloped tile - the ground is there, the way is
+# buildable, and there is nothing to see. Diagonals do have a fallback
+# (weg.cc:616 checks for IMG_EMPTY); slopes do not.
+#
+# Double-height slopes ARE optional: way_desc.h:176 reuses the single-height
+# images for both ("hack for old ways without double height images").
+{slopes}
 """
 
 
 def way_dat(name, images, ui, waytype="road", system_type=0, cost=100,
             maintenance=100, topspeed=50, axle_load=9999, author="",
-            intro_year=1900, retire_year=2999):
+            intro_year=1900, retire_year=2999, slopes=""):
     """A compilable way .dat. `ui` is the icon/cursor block - see ui_block()."""
+    if not slopes:
+        slopes = ("# NONE. This way will not be drawn on any slope - see above.")
     return _WAY_SKELETON.format(
         name=name, author=author, waytype=waytype, system_type=system_type,
         cost=cost, maintenance=maintenance, topspeed=topspeed,
         axle_load=axle_load, intro_year=intro_year, retire_year=retire_year,
-        ui=ui, images=images,
+        ui=ui, images=images, slopes=slopes,
     )
 
 

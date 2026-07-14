@@ -331,10 +331,27 @@ def _render(p, out):
     if p.obj_type == "way":
         frames = rig.render_way(bpy, out, p.pakset, basename=p.basename,
                                 align_offset=tuple(p.align_offset))
+
+        # The ramp, if the artist modelled one (collection way_slope, and way_slope2
+        # for a double-height ramp). Without it the way is INVISIBLE on every slope
+        # in the game - weg.cc:545 has no fallback, unlike the diagonals - so this
+        # is not an optional flourish. The linter is what tells the artist it is
+        # missing; nothing here can, until the panel can carry a warning.
+        slope_frames = slope2_frames = ()
+        if rig.has_slope_model(bpy):
+            slope_frames = rig.render_way_slopes(
+                bpy, out, p.pakset, basename=p.basename,
+                align_offset=tuple(p.align_offset))
+        if rig.has_slope_model(bpy, double=True):
+            slope2_frames = rig.render_way_slopes(
+                bpy, out, p.pakset, basename=p.basename, double=True,
+                align_offset=tuple(p.align_offset))
+
         if not p.write_dat:
             return frames, None, None
         png, dat, _pl = rig.build_way_sheet_and_dat(
             frames, out, p.pakset, basename=p.basename, cols=4,
+            slope_frames=slope_frames, slope2_frames=slope2_frames,
             waytype=p.waytype, topspeed=p.topspeed, cost=p.cost,
             maintenance=p.maintenance, intro_year=p.intro_year, **common)
         return frames, png, dat

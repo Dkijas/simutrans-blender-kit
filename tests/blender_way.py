@@ -50,11 +50,15 @@ def check(name, cond, detail=""):
         FAILED.append(name)
 
 
-def _slab(name, x0, x1, y0, y1, tile_world, mat):
-    """A flat rectangle of asphalt, given in TILE units (the tile is -0.5..+0.5)."""
+def _slab(name, x0, x1, y0, y1, tile_world, mat, z0=0.0, z1=0.0):
+    """A rectangle of asphalt, given in TILE units (the tile is -0.5..+0.5).
+
+    z0 is the height at y0 and z1 the height at y1, in Blender units, so the same
+    call makes both a flat piece and a ramp.
+    """
     s = tile_world
-    verts = [(x0 * s, y0 * s, 0.0), (x1 * s, y0 * s, 0.0),
-             (x1 * s, y1 * s, 0.0), (x0 * s, y1 * s, 0.0)]
+    verts = [(x0 * s, y0 * s, z0), (x1 * s, y0 * s, z0),
+             (x1 * s, y1 * s, z1), (x0 * s, y1 * s, z1)]
     mesh = bpy.data.meshes.new(name)
     mesh.from_pydata(verts, [], [(0, 1, 2, 3)])
     mesh.update()
@@ -110,6 +114,27 @@ def build_road():
             col.objects.link(
                 _slab("%s_paint" % piece, -0.02, 0.02, -0.45, 0.45, tw, paint))
 
+    # --- the seventh shape: the RAMP.
+    #
+    # A way with no slope images is not drawn on a hill at all (weg.cc:545 has no
+    # guard), so the artist has to model this one too. It is the STRAIGHT piece
+    # sitting on a slope that FACES NORTH - and "north slope" means the SOUTH
+    # corners are the raised ones:
+    #
+    #     ribi.h:  north = southeast + southwest
+    #
+    # North is +Y here, so the ramp is high at -Y and meets the ground at +Y. The
+    # rise is one height level, which is a property of the PAKSET and not a
+    # constant: pak128's simuconf.tab says tile_height = 8, the demo pak says 16,
+    # and both come out at sixteen screen pixels.
+    rise = pak.height_world
+    col = bpy.data.collections.new(rig.WAY_COLLECTION_PREFIX + ways.SLOPE_PIECE)
+    bpy.context.scene.collection.children.link(col)
+    col.objects.link(_slab("slope_road", -w, w, -0.5, 0.5, tw, asphalt,
+                           z0=rise, z1=0.0))
+    col.objects.link(_slab("slope_paint", -0.02, 0.02, -0.45, 0.45, tw, paint,
+                           z0=rise * 0.9, z1=rise * 0.1))
+
 
 def probe_pixel(tile_px, bit):
     """Where the midpoint of the tile edge for this direction bit lands, in the cell.
@@ -123,6 +148,37 @@ def probe_pixel(tile_px, bit):
     cx = projection.TILE_CENTRE_IN_CELL[0] * tile_px + sx
     cy = projection.TILE_CENTRE_IN_CELL[1] * tile_px + sy
     return (int(round(cx)), int(round(cy)))
+
+
+def edge_mean_y(path, tile_px, bit, window=48):
+    """Mean screen y of the asphalt in the probe column at that tile edge, or None.
+
+    The MEAN, not the topmost pixel. The topmost pixel of a tilted strip is a
+    corner of its silhouette, and which corner that is depends on which way the
+    strip runs across the screen - so it reads differently for a ramp that climbs
+    up-left than for one that climbs up-right, and it measured four different lifts
+    for four ramps that are the same model turned. The mean is the surface.
+    """
+    w, h, alpha, px = sheet.read_png(path)
+    cx, cy = probe_pixel(tile_px, bit)
+    ys = []
+    for y in range(max(0, cy - window), min(h, cy + window + 1)):
+        for dx in range(-PROBE_RADIUS_PX, PROBE_RADIUS_PX + 1):
+            x = cx + dx
+            if 0 <= x < w and (not alpha or px[y * w + x][3] > 0):
+                ys.append(y)
+    return sum(ys) / len(ys) if ys else None
+
+
+# A slope is named after the direction it FACES, so the corners on the OPPOSITE
+# side are the raised ones - ribi.h: north = southeast + southwest. And a way on a
+# slope runs along it, so each ramp's flat twin is the straight it turns into.
+SLOPE_RAISED_EDGE = {"n": ways.SOUTH, "s": ways.NORTH,
+                     "e": ways.WEST, "w": ways.EAST}
+SLOPE_LOW_EDGE = {"n": ways.NORTH, "s": ways.SOUTH,
+                  "e": ways.EAST, "w": ways.WEST}
+SLOPE_FLAT_TWIN = {"n": ways.NORTH | ways.SOUTH, "s": ways.NORTH | ways.SOUTH,
+                   "e": ways.EAST | ways.WEST, "w": ways.EAST | ways.WEST}
 
 
 def connects(path, tile_px, bit):
@@ -185,8 +241,68 @@ def main():
               % (ways.code(ribi), tile_px, tile_px),
               (w, h) == (tile_px, tile_px) and alpha, "%dx%d" % (w, h))
 
+    # --- THE RAMP.
+    #
+    # A way with no slope images is INVISIBLE on every hill: weg.cc:545 calls
+    # set_images(image_slope, ...) with no IMG_EMPTY guard, unlike the diagonals at
+    # weg.cc:616. Every way this kit has ever produced was flat-only.
+    check("the artist's ramp collection is there", rig.has_slope_model(bpy))
+
+    slope_frames = rig.render_way_slopes(bpy, OUT, PAKSET, basename="bkitroad")
+    check("four slope images rendered", len(slope_frames) == 4, str(len(slope_frames)))
+
+    by_slope = dict(slope_frames)
+
+    # THE ORACLE, and it is a measurement rather than an eyeball.
+    #
+    # One height level is tile_height * tile_px / 64 screen pixels (simconst.h:110):
+    # for pak128, 8 * 128/64 = 16. But the probe does not sit ON the tile edge, it
+    # sits PROBE_AT of the way out, so the ramp has not finished climbing there. The
+    # ramp runs from the low edge (z = 0) to the raised one (z = one level) across
+    # the tile, so at the probe it stands at
+    #
+    #     (0.5 + PROBE_AT) of a level under the raised edge
+    #     (0.5 - PROBE_AT) of a level under the low one
+    #
+    # Both are asserted. Checking only the high end would pass a ramp that is
+    # climbing at twice the angle from below ground.
+    rise_px = pak.height_rise_px
+    want_high = rise_px * (0.5 + PROBE_AT)
+    want_low = rise_px * (0.5 - PROBE_AT)
+
+    for name in ways.SLOPE_NAMES:
+        flat = by_ribi[SLOPE_FLAT_TWIN[name]]
+        ramp = by_slope[name]
+
+        high = (edge_mean_y(flat, tile_px, SLOPE_RAISED_EDGE[name]),
+                edge_mean_y(ramp, tile_px, SLOPE_RAISED_EDGE[name]))
+        low = (edge_mean_y(flat, tile_px, SLOPE_LOW_EDGE[name]),
+               edge_mean_y(ramp, tile_px, SLOPE_LOW_EDGE[name]))
+
+        check("imageup[%s]: both ends of the ramp have road on them" % name,
+              None not in high and None not in low, "%r %r" % (high, low))
+        if None in high or None in low:
+            continue
+
+        lifted = high[0] - high[1]
+        stayed = low[0] - low[1]
+        print("       imageup[%s]: raised end +%.1f px (want %.1f), low end +%.1f px"
+              " (want %.1f)" % (name, lifted, want_high, stayed, want_low))
+        check("imageup[%s]: the raised end climbs %.1f px" % (name, want_high),
+              abs(lifted - want_high) <= 2.0,
+              "it climbs %.1f px - the ramp is the wrong height, or it faces the "
+              "wrong way" % lifted)
+        check("imageup[%s]: the low end is still nearly on the ground" % name,
+              abs(stayed - want_low) <= 2.0,
+              "the low end is %.1f px up, not %.1f - the ramp climbs the wrong way"
+              % (stayed, want_low))
+
+    check("the four ramps are four different pictures",
+          len({tuple(sheet.read_png(p)[3]) for _n, p in slope_frames}) == 4)
+
     sheet_png, dat_path, placement = rig.build_way_sheet_and_dat(
         frames, OUT, PAKSET, basename="bkitroad", cols=4,
+        slope_frames=slope_frames,
         name="BKit_Road", waytype="road", topspeed=80, cost=100, maintenance=10,
         author="simutrans-blender-kit")
 
@@ -195,6 +311,8 @@ def main():
 
     check("dat is a way", "obj=way" in dat)
     check("dat is a road", "waytype=road" in dat)
+    check("dat carries all four slope images, or the road vanishes on hills",
+          all(("imageup[%s]=" % d) in dat for d in ways.SLOPE_NAMES), dat)
     # way_writer.cc:95 fatals without this one, and only this one
     check("dat carries the mandatory image[-]", "image[-]=" in dat, dat)
     check("dat carries every ribi",

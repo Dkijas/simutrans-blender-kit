@@ -861,9 +861,13 @@ def collection_piece_setup(prefix=WAY_COLLECTION_PREFIX):
                 ob.hide_render = hide
         if not found:
             raise ValueError(
-                "no collection named %r. A way is modelled as six shapes, one per "
-                "collection: %s" % (wanted,
-                                    ", ".join(prefix + p for p in ways.PIECE_NAMES)))
+                "no collection named %r. A way is modelled as six flat shapes and "
+                "a ramp, one per collection: %s - and optionally %s for a "
+                "double-height ramp."
+                % (wanted,
+                   ", ".join(prefix + p for p in
+                             ways.PIECE_NAMES + (ways.SLOPE_PIECE,)),
+                   prefix + ways.SLOPE_PIECE_DOUBLE))
     return setup
 
 
@@ -914,6 +918,63 @@ def render_way(bpy, out_dir, pakset_name="pak128", basename="way",
         frames.append((ribi, path))
 
     warn_if_clipped(frames, "way", GROUND_WATCH)
+    return frames
+
+
+def has_slope_model(bpy, double=False, prefix=WAY_COLLECTION_PREFIX):
+    """Did the artist model the ramp? -> bool."""
+    wanted = prefix + (ways.SLOPE_PIECE_DOUBLE if double else ways.SLOPE_PIECE)
+    return any(col.name == wanted for col in bpy.data.collections)
+
+
+def render_way_slopes(bpy, out_dir, pakset_name="pak128", basename="way",
+                      double=False, piece_setup=None, distance=20.0,
+                      align_offset=(0.0, 0.0, 0.0)):
+    """Render a way's four slope images. Returns [(slope_name, png_path), ...].
+
+    WITHOUT THESE THE WAY IS INVISIBLE ON EVERY HILL. weg.cc:545 calls
+    set_images(image_slope, ...) unguarded, so a way that has no slope images is
+    not drawn on a sloped tile at all: the ground is there, the way is buildable
+    and paid for, and there is simply nothing to see. (Diagonals are forgiving -
+    weg.cc:616 checks for IMG_EMPTY and falls back to the curves. Slopes are not.)
+
+    MODEL CONVENTION, in the same grammar as the other six shapes: one more
+    collection, way_slope, holding a STRAIGHT way sitting on a ramp that faces
+    NORTH. The other three are that model turned, exactly as the flat pieces are.
+
+    The artist has to model it. The alternative - tilting the flat piece for them -
+    would stretch the ballast and shear the sleepers, and there is no honest way to
+    fake the join at the top of the ramp.
+
+    way_slope2 is the same thing on a DOUBLE-height ramp, and it is optional:
+    way_desc.h:176 reuses the single-height images for both if it is absent.
+    """
+    if piece_setup is None:
+        piece_setup = collection_piece_setup()
+
+    target = tile_anchor(pakset_name, align_offset)
+    build_rig(bpy, pakset_name, distance, target=target)
+    cam = bpy.data.objects[CAM_NAME]
+    scene = bpy.context.scene
+    out_dir = _prepare_out(out_dir)
+
+    piece_setup(bpy, ways.SLOPE_PIECE_DOUBLE if double else ways.SLOPE_PIECE)
+
+    frames = []
+    for _key, name, turns in ways.slope_plan(double=double):
+        az = ways.azimuth_for(turns)
+        cam.rotation_euler = tuple(math.radians(a)
+                                   for a in (projection_rot_x(), 0.0, az))
+        cam.location = _camera_location(distance, az, 30.0, target)
+        aim_sun(bpy, az)          # as everywhere else: the sun rides with the camera
+
+        suffix = "up2" if double else "up"
+        path = os.path.join(out_dir, "%s_%s_%s.png" % (basename, suffix, name))
+        scene.render.filepath = path
+        bpy.ops.render.render(write_still=True)
+        frames.append((name, path))
+
+    warn_if_clipped(frames, "way slope", GROUND_WATCH)
     return frames
 
 
@@ -1114,16 +1175,38 @@ def build_roadsign_sheet_and_dat(frames, out_dir, pakset_name="pak128",
 
 
 def build_way_sheet_and_dat(frames, out_dir, pakset_name="pak128",
-                            basename="way", cols=4, **dat_kwargs):
-    """Assemble the way's sheet and write a compilable .dat next to it."""
+                            basename="way", cols=4, slope_frames=(),
+                            slope2_frames=(), **dat_kwargs):
+    """Assemble the way's sheet and write a compilable .dat next to it.
+
+    The flat images are keyed by ribi (an int), the slope images by direction
+    ("n", "w", "e", "s"). They share one sheet and are told apart by that.
+    """
     pak = paksets.get(pakset_name)
     out_dir = _prepare_out(out_dir)
     sheet_png = os.path.join(out_dir, "%s.png" % basename)
-    placement = sheet.assemble(frames, pak.tile_px, cols=cols, out_path=sheet_png)
+
+    all_frames = (list(frames)
+                  + [(("up", d), p) for d, p in slope_frames]
+                  + [(("up2", d), p) for d, p in slope2_frames])
+    cells = sheet.assemble(all_frames, pak.tile_px, cols=cols, out_path=sheet_png)
+
+    placement = {k: v for k, v in cells.items() if isinstance(k, int)}
+    up = {d: v for (kind, d), v in
+          ((k, v) for k, v in cells.items() if isinstance(k, tuple))
+          if kind == "up"}
+    up2 = {d: v for (kind, d), v in
+           ((k, v) for k, v in cells.items() if isinstance(k, tuple))
+           if kind == "up2"}
 
     block = ways.image_block(basename, placement)
     ui = ways.ui_block(basename, placement)
-    dat_text = ways.way_dat(dat_kwargs.pop("name", basename), block, ui, **dat_kwargs)
+    slopes = "\n".join(b for b in (
+        ways.slope_image_block(basename, up),
+        ways.slope_image_block(basename, up2, double=True)) if b)
+
+    dat_text = ways.way_dat(dat_kwargs.pop("name", basename), block, ui,
+                            slopes=slopes, **dat_kwargs)
     dat_path = os.path.join(out_dir, "%s.dat" % basename)
     with open(dat_path, "w", encoding="utf-8") as f:
         f.write(dat_text)
