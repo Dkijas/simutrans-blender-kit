@@ -448,6 +448,63 @@ def test_tunnel_portal_dat():
           "it would ship an unbuildable tunnel in silence")
 
 
+def test_bridge_dat():
+    """A single-height bridge: four image groups, two layers, a mandatory icon.
+
+    Verified against makeobj (exit 0, packs bridge.BKit_Bridge). The groups and
+    their directions are the writer's own (bridge_writer.cc names[]): span ns/ew,
+    start and ramp n/s/e/w, pillar s/w - read back by position, so a hole shifts
+    every image after it onto the wrong piece.
+    """
+    from core import bridges, schema
+
+    def grp(row0):
+        return {"image": {"ns": (row0, 0), "ew": (row0, 1)},
+                "start": {"n": (row0 + 1, 0), "s": (row0 + 1, 1),
+                          "e": (row0 + 1, 2), "w": (row0 + 1, 3)},
+                "ramp": {"n": (row0 + 2, 0), "s": (row0 + 2, 1),
+                         "e": (row0 + 2, 2), "w": (row0 + 2, 3)},
+                "pillar": {"s": (row0 + 3, 0), "w": (row0 + 3, 1)}}
+
+    back, front = grp(0), grp(4)
+    block = bridges.image_block("brg", back, front)
+    check("span, start, ramp then pillar, back before front",
+          block.splitlines()[:3] == ["backimage[ns]=brg.0.0",
+                                      "backimage[ew]=brg.0.1",
+                                      "backstart[n]=brg.1.0"], block)
+    check("all 24 images (12 back + 12 front)",
+          block.count("back") == 12 and block.count("front") == 12, block)
+
+    # a hole in any group is refused - the engine reads by position
+    holed = grp(0)
+    del holed["start"]["w"]
+    try:
+        bridges.image_block("brg", holed)
+        check("a missing start direction is refused", False, "no error")
+    except ValueError as e:
+        check("a missing start direction is refused", "missing w" in str(e), str(e))
+
+    ui = bridges.icon_block("brg", back)
+    dat = bridges.bridge_dat("BKit_Bridge", block, ui, waytype="track",
+                             topspeed=80, cost=200000, maintenance=1000,
+                             max_length=8, pillar_distance=2)
+    check("dat is a bridge", "obj=bridge" in dat)
+    check("dat carries the span, both ways",
+          "backimage[ns]=" in dat and "backimage[ew]=" in dat, dat)
+    check("dat carries an icon, or it cannot be built", "\nicon=brg." in dat, dat)
+    check("dat sets the length and pillar limits",
+          "max_length=8" in dat and "pillar_distance=2" in dat, dat)
+    check("the bridge .dat lints clean", not schema.lint(dat),
+          "; ".join(str(f) for f in schema.lint(dat)))
+
+    without_icon = "\n".join(l for l in dat.splitlines()
+                             if not l.startswith("icon="))
+    check("the linter catches a bridge with no icon",
+          any(f.level == "error" and "icon" in f.message
+              for f in schema.lint(without_icon)),
+          "it would ship an unbuildable bridge in silence")
+
+
 def test_dat_has_no_end_of_line_comments():
     """A .dat has NO trailing comments - and the engine dies if you write one.
 
