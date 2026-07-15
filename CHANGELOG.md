@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.5.0
+
+### Added
+
+- **Cargo variants (freight images).** A wagon can now show a different sprite for
+  each good it carries — empty, loaded with coal, loaded with oil. Put each load in
+  a collection `freight_0`, `freight_1`, … (the same additive convention as
+  seasons), list the goods in the new **Cargo variants** field (`Kohle, Oel`), and
+  the render produces the empty sheet plus one loaded sheet per good and writes the
+  `emptyimage` / `freightimage[i]` / `freightimagetype[i]` `.dat` the engine needs.
+
+  Grounded in the engine source throughout: the engine requires exactly one
+  `freightimagetype` per freight image and makeobj FATALs without it; it shows the
+  empty image when the wagon is unloaded and the matching freight image when it is
+  not, falling back to index 0. There are no "livery" images in base Simutrans —
+  that is a Simutrans Extended feature — so this is freight, precisely.
+
+  Verified end to end: the emitted `.dat` compiles under makeobj (and fails without
+  the `freightimagetype` lines); the empty and loaded sprites differ pixel for pixel
+  in every heading; and the wagon loads in the running engine, is buyable, and its
+  freight goods really resolve — which only the game can prove, because makeobj
+  defers the goods to load time.
+
 ## 0.4.0
 
 ### Added
