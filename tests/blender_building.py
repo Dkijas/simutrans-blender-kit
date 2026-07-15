@@ -194,6 +194,27 @@ def main():
     check("the player-colour band survived", bool(colors.scan(rgb)),
           "no reserved colour in the sheet")
 
+    # --- the same sprites, written as a STATION STOP for the game to try to build.
+    # A stop is just a building with a type and a waytype - and an icon, without
+    # which hausbauer.cc:235 gives it no builder and the game offers it to nobody.
+    stop_png = os.path.join(OUT, "bkitstop.png")
+    stop_place = sheet.assemble(frames, pak.tile_px, cols=4, out_path=stop_png)
+    stop_dat = buildings.building_dat(
+        "BKit_Stop", buildings.image_block("bkitstop", stop_place),
+        btype="stop", dims="1,1,4", level=2, waytype="track",
+        enables=["pax", "post"],
+        icon=buildings.icon_ref("bkitstop", stop_place),
+        animation_time=buildings.DEFAULT_ANIMATION_TIME_MS)
+    stop_path = os.path.join(OUT, "bkitstop.dat")
+    with open(stop_path, "w", encoding="utf-8") as f:
+        f.write(stop_dat)
+    check("stop dat is a stop with a waytype",
+          "type=stop" in stop_dat and "waytype=track" in stop_dat, stop_dat)
+    check("stop dat carries an icon, or the game will not build it",
+          "\nicon=" in stop_dat, stop_dat)
+    check("stop dat lints clean", not schema.lint(stop_dat),
+          str(schema.lint(stop_dat)))
+
     print("\nsheet: %s\ndat:   %s" % (sheet_png, dat_path))
     if FAILED:
         print("\nBUILDING_FAILED: %s" % ", ".join(FAILED))

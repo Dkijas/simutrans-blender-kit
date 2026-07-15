@@ -87,6 +87,7 @@ ADDONS128 = os.path.join(USERDIR128, "addons", "pak128")
 PAK_BUILDS = (
     (("demo", "bkitloco.dat"),      "pak64",  "bkitloco.pak"),
     (("house", "bkithouse.dat"),    "pak128", "bkithouse.pak"),
+    (("house", "bkitstop.dat"),     "pak128", "bkitstop.pak"),
     (("freight", "bkithopper.dat"), "pak128", "bkithopper.pak"),
     (("tunnel", "bkittunnel.dat"),  "pak128", "bkittunnel.pak"),
     (("way", "bkitroad.dat"),       "pak128", "bkitroad.pak"),
@@ -434,6 +435,11 @@ def suite_game_tunnel():
     return _game("bkittunnel", r"BKITTUNNEL_OK", "game:tunnel")
 
 
+def suite_game_stop():
+    """The generated station stop loads and, icon and all, is buildable."""
+    return _game("bkitstop", r"BKITSTOP_OK", "game:stop")
+
+
 def suite_game_civia():
     """One click on the cab car has to give five cars, in order, and they must run."""
     return _game128("civia465", r"CIVIA465_OK", "game:civia")
@@ -472,6 +478,7 @@ SUITES = {
     "running": suite_game_running,
     "hopper": suite_game_hopper,
     "tunnel-game": suite_game_tunnel,
+    "stop": suite_game_stop,
     "house": suite_game_house,
     "road": suite_game_road,
     "game-infra": suite_game_infra,
@@ -490,7 +497,7 @@ ORDER = ("core", "schema", "colours",
          # the .pak the game will load, compiled from what was just rendered
          "paks",
          # the game, against the demo pakset
-         "catalogue", "running", "hopper", "tunnel-game", "house", "road",
+         "catalogue", "running", "hopper", "tunnel-game", "stop", "house", "road",
          "game-infra", "game-all",
          # the game, against a real pakset - these build and install their own
          "asset-civia", "civia", "asset-metro9k",
