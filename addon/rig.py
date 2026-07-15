@@ -23,14 +23,14 @@ import sys
 try:
     # installed in Blender: we are <addon-package>.addon.rig
     from ..core import (buildings, colors, datgen, directions, paksets,
-                        projection, roadsigns, sheet, ways)
+                        projection, roadsigns, sheet, tunnels, ways)
 except ImportError:
     # run straight from a checkout (the tests, and `blender --python ...`)
     _HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if _HERE not in sys.path:
         sys.path.insert(0, _HERE)
     from core import (buildings, colors, datgen, directions, paksets,
-                      projection, roadsigns, sheet, ways)
+                      projection, roadsigns, sheet, tunnels, ways)
 
 CAM_NAME = "SIMUTRANS_CAM"
 SUN_NAME = "SIMUTRANS_SUN"
@@ -1126,6 +1126,106 @@ def render_way_slopes(bpy, out_dir, pakset_name="pak128", basename="way",
 
     warn_if_clipped(frames, "way slope", GROUND_WATCH)
     return frames
+
+
+TUNNEL_COLLECTION_PREFIX = "tunnel_"
+
+
+def has_tunnel_model(bpy, prefix=TUNNEL_COLLECTION_PREFIX):
+    """Is there a tunnel_portal collection to render?"""
+    return any(c.name == prefix + "portal" and c.objects
+               for c in bpy.data.collections)
+
+
+def _has_tunnel_front(bpy, prefix=TUNNEL_COLLECTION_PREFIX):
+    return any(c.name == prefix + "portal_front" and c.objects
+               for c in bpy.data.collections)
+
+
+def _tunnel_layer_setup(bpy, layer, prefix=TUNNEL_COLLECTION_PREFIX):
+    """Show the back (tunnel_portal) or front (tunnel_portal_front) parts alone."""
+    wanted = prefix + "portal" + ("_front" if layer == "front" else "")
+    for col in bpy.data.collections:
+        if not col.name.startswith(prefix):
+            continue
+        hide = col.name != wanted
+        for ob in col.objects:
+            ob.hide_render = hide
+
+
+def render_tunnel_portals(bpy, out_dir, pakset_name="pak128", basename="tunnel",
+                          distance=20.0, align_offset=(0.0, 0.0, 0.0)):
+    """Render the portal in four directions and, if present, two layers.
+
+    -> {"back": [(dir, path), ...], "front": [(dir, path), ...]}.
+
+    Reuses the very camera the way ramps are proven correct on: each portal key's
+    orientation is tunnels.PORTAL_TURNS quarter-turns and the sun rides with it, as
+    everywhere. Two layers like catenary - back = tunnel_portal (drawn behind the
+    vehicle), front = tunnel_portal_front (drawn over it) - so the arch occludes the
+    train instead of the train driving through it. front is optional.
+
+    MODEL CONVENTION: the portal on a ramp that faces NORTH (mouth opening toward
+    +Y, hill rising south), in collection tunnel_portal, and the parts that go over
+    the vehicle in tunnel_portal_front. The other three directions are that model
+    turned, exactly as the way slopes.
+    """
+    target = tile_anchor(pakset_name, align_offset)
+    build_rig(bpy, pakset_name, distance, target=target)
+    cam = bpy.data.objects[CAM_NAME]
+    scene = bpy.context.scene
+    out_dir = _prepare_out(out_dir)
+
+    layers = ["back"] + (["front"] if _has_tunnel_front(bpy) else [])
+    result = {"back": [], "front": []}
+    for layer in layers:
+        _tunnel_layer_setup(bpy, layer)
+        for d in tunnels.DIRS:
+            az = ways.azimuth_for(tunnels.PORTAL_TURNS[d])
+            cam.rotation_euler = tuple(math.radians(a)
+                                       for a in (projection_rot_x(), 0.0, az))
+            cam.location = _camera_location(distance, az, 30.0, target)
+            aim_sun(bpy, az)
+            path = os.path.join(out_dir, "%s_%s_%s.png" % (basename, layer, d))
+            scene.render.filepath = path
+            bpy.ops.render.render(write_still=True)
+            result[layer].append((d, path))
+
+    warn_if_clipped(result["back"], "tunnel portal", GROUND_WATCH)
+    return result
+
+
+def build_tunnel_sheet_and_dat(portals, out_dir, pakset_name="pak128",
+                               basename="tunnel", cols=4, icon_dir="s",
+                               **dat_kwargs):
+    """Assemble the portal images into one sheet and write the tunnel .dat.
+
+    portals: {"back": [(dir, path)...], "front": [(dir, path)...]} from
+    render_tunnel_portals. back keyed by direction, front by (front, direction) in
+    the shared sheet, told apart the way the way writer tells flat from slope.
+    """
+    pak = paksets.get(pakset_name)
+    out_dir = _prepare_out(out_dir)
+    sheet_png = os.path.join(out_dir, "%s.png" % basename)
+
+    all_frames = [(d, p) for d, p in portals["back"]]
+    all_frames += [(("front", d), p) for d, p in portals.get("front", [])]
+    cells = sheet.assemble(all_frames, pak.tile_px, cols=cols, out_path=sheet_png)
+
+    warn_if_reserved_colors(bpy_module(), sheet_png, what="the tunnel sheet")
+
+    back = {k: v for k, v in cells.items() if isinstance(k, str)}
+    front = {d: v for (_layer, d), v in
+             ((k, v) for k, v in cells.items() if isinstance(k, tuple))}
+    block = tunnels.image_block(basename, back, front or None)
+    ui = tunnels.icon_block(basename, back, icon_dir=icon_dir)
+
+    dat_text = tunnels.tunnel_dat(dat_kwargs.pop("name", basename), block, ui,
+                                  **dat_kwargs)
+    dat_path = os.path.join(out_dir, "%s.dat" % basename)
+    with open(dat_path, "w", encoding="utf-8") as f:
+        f.write(dat_text)
+    return sheet_png, dat_path, back
 
 
 def collection_variant_setup(prefix):

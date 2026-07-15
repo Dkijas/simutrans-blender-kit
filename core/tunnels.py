@@ -26,6 +26,22 @@ extras; this module emits the narrow, single-season portal.
 DIRS = ("n", "s", "e", "w")
 
 
+# Which physical slope orientation carries each portal key, as quarter-turns of a
+# base portal modelled on a NORTH-facing ramp (mouth opening toward +Y, hill rising
+# to the south). DERIVED, not guessed: tunnel_desc.cc slope_indices puts key "n" on
+# a south slope, "s" on north, "e" on west, "w" on east; a tunnel keyed d heads
+# INTO the hill, so it sits on the slope facing the OPPOSITE way, and composing that
+# with the way module's facing->turns table (ways.SLOPE_TURNS) gives:
+#
+#     n -> south slope -> 2 turns    s -> north slope -> 0 turns
+#     e -> west  slope -> 3 turns    w -> east  slope -> 1 turn
+#
+# Held as a table and VERIFIED by placing a tunnel in game (not reasoned to be
+# final), because this facing/heading reflection is exactly the one the way slopes
+# proved you cannot settle by staring at it.
+PORTAL_TURNS = {"n": 2, "s": 0, "e": 3, "w": 1}
+
+
 def image_block(basename, back, front=None):
     """backimage[dir] / frontimage[dir] lines for the four portal directions.
 

@@ -350,6 +350,11 @@ def suite_blender_freight():
     return _blender("blender_freight.py", "FREIGHT_OK")
 
 
+def suite_blender_tunnel():
+    """A tunnel portal: four turned directions in two layers, back and front."""
+    return _blender("blender_tunnel.py", "TUNNEL_OK")
+
+
 def suite_game_house():
     """Can the generated house actually be planted on the map?"""
     return _game("bkithouse", r"BKITHOUSE_OK", "game:house")
@@ -448,6 +453,7 @@ SUITES = {
     "footprint": suite_blender_footprint,
     "way": suite_blender_way,
     "freight": suite_blender_freight,
+    "tunnel": suite_blender_tunnel,
     "infra": suite_blender_infra,
     "addon": suite_blender_addon,
     "panel": suite_blender_panel,
@@ -472,8 +478,8 @@ SUITES = {
 # nothing downstream of "paks" can pass on art that this run did not render.
 ORDER = ("core", "schema", "colours",
          # producers: the art and the .dat
-         "e2e", "alignment", "building", "footprint", "way", "freight", "infra",
-         "addon", "panel", "demo-all", "demo-loco",
+         "e2e", "alignment", "building", "footprint", "way", "freight", "tunnel",
+         "infra", "addon", "panel", "demo-all", "demo-loco",
          # the .pak the game will load, compiled from what was just rendered
          "paks",
          # the game, against the demo pakset
