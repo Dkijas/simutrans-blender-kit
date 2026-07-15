@@ -773,6 +773,34 @@ def test_linter_survives_malformed_input():
           str(schema.expand_key("image[0-]")))
 
 
+def test_linter_validates_integer_values():
+    """A key the engine reads with atoi() must be given an integer.
+
+    atoi never fails - it stops at the first non-digit and returns 0 or a prefix -
+    so power=abc is silently 0, cost=1,000 is silently 1, level=2.5 is silently 2,
+    and makeobj says nothing. The schema already knows which keys are integers.
+    """
+    from core import schema
+
+    def has_int_error(value):
+        dat = "obj=vehicle\nname=X\npower=%s\nimage[1]=x.0.0\n" % value
+        return any("is not an integer" in f.message and f.level == "error"
+                   for f in schema.lint(dat))
+
+    for bad in ("abc", "1,000", "2.5", "12px", ""):
+        if bad == "":
+            continue                     # an empty value is a different shape of odd
+        check("power=%s is caught" % bad, has_int_error(bad), bad)
+
+    for good in ("120", "-9", "+3", "250000", "0"):
+        check("power=%s is accepted" % good, not has_int_error(good), good)
+
+    # and it must not fire on a NON-integer key: name=abc is perfectly fine
+    check("a string key is not held to integer syntax",
+          not any("is not an integer" in f.message
+                  for f in schema.lint("obj=vehicle\nname=abc123\nimage[1]=x.0.0\n")))
+
+
 def test_building_image_block():
     from core import buildings, schema
 

@@ -253,6 +253,20 @@ WAYTYPES = ("none", "road", "track", "electrified_track", "maglev_track",
             "schiene_tram", "tram_track", "power", "decoration")
 WAYTYPE_KEYS = ("waytype", "own_waytype")
 
+# The readers that run the value through atoi() - i.e. the key is a NUMBER.
+# get_koord/get_color/get_ints parse several numbers with their own grammar, so
+# they are deliberately left out of this simple "is it one integer?" check.
+_INT_READERS = ("get_int", "get_int64", "get_int_clamped")
+
+# atoi's idea of an integer: optional surrounding space, optional sign, digits.
+_INTEGER = re.compile(r"[+-]?\d+\Z")
+
+
+def _atoi(text):
+    """What the engine's atoi() would make of this string. Never raises."""
+    m = re.match(r"\s*([+-]?\d+)", text)
+    return int(m.group(1)) if m else 0
+
 
 def _icon_findings(icon_blocks):
     """[[obj_type, line of the obj= key, saw an icon?], ...] -> [Finding].
@@ -520,6 +534,23 @@ def lint(text):
                                    "get_waytype() does not shrug it off - it calls "
                                    "dbg->fatal() and makeobj dies. It knows: %s"
                                    % (key, got, ", ".join(WAYTYPES))))
+
+        # A KEY THE ENGINE READS AS A NUMBER, GIVEN SOMETHING THAT IS NOT ONE.
+        #
+        # obj.get_int() is atoi(get(key)), and atoi reads an optional sign and then
+        # digits, STOPPING at the first thing that is not one - it never fails, it
+        # just returns 0 or a prefix. So power=abc is silently power 0, cost=1,000 is
+        # silently cost 1, level=2.5 is silently level 2, and makeobj says nothing.
+        # The schema already knows which keys are read this way; validate them.
+        if reader_of(obj_type, key) in _INT_READERS:
+            val = value.split("#")[0].strip()
+            if val and not _INTEGER.match(val):
+                reads = _atoi(val)
+                out.append(Finding("error", n,
+                                   "%s=%s is not an integer. The engine reads it with "
+                                   "atoi(), which stops at the first non-digit and "
+                                   "would take this as %d - silently. makeobj will not "
+                                   "warn." % (key, val, reads)))
 
         # A key can stand for a whole family: image[n,e,s,w][0-1] is eight of them.
         keys = expand_key(key)
