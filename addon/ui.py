@@ -489,6 +489,7 @@ def _build_dat(p, out, record):
             level=p.level, chance=p.chance, intro_year=p.intro_year,
             waytype=p.waytype if is_station else "",
             enables=enables if is_station else (),
+            icon=buildings.icon_ref(p.basename, placement) if is_station else "",
             animation_time=(buildings.DEFAULT_ANIMATION_TIME_MS
                             if p.phases > 1 else None),
             **common)

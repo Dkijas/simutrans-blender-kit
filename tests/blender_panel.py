@@ -301,6 +301,8 @@ def main():
           dat and "\ntype=stop\n" in dat and "\nwaytype=track\n" in dat, dat)
     check("...that accepts passengers and mail",
           dat and "enables_pax=1" in dat and "enables_post=1" in dat, dat)
+    check("...and an icon, or it cannot be built (hausbauer.cc:235)",
+          dat and "\nicon=" in dat and "\ncursor=" in dat, dat)
 
     # --- a depot: a house's waytype must NOT leak into it, and back to a house
     p.obj_name = "Panel_Depot"

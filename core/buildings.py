@@ -279,6 +279,21 @@ def image_block(basename, placement, kind=BACK):
 
 
 # See core/datgen.py for why no comment ever shares a line with a value.
+def icon_ref(basename, placement):
+    """A sheet reference for the icon of a stop/depot, from its base tile image.
+
+    A player-built building needs one or it CANNOT be built: hausbauer.cc:235 gives
+    a building whose cursor image 1 (the icon) is empty a NULL builder, the same
+    silent trap as a way. City buildings (res/com/...) are spawned, not built, so
+    they need no icon; stops, depots and extensions do. Reuses the base tile's
+    image, as a way reuses a ribi image.
+    """
+    base = (0, 0, 0, 0, 0, 0)
+    key = base if base in placement else min(placement)
+    r, c = placement[key]
+    return "%s.%d.%d" % (basename, r, c)
+
+
 def station_block(waytype, enables):
     """waytype= and enables_* lines for a stop / depot / extension. '' otherwise.
 
@@ -323,7 +338,7 @@ retire_year={retire_year}
 
 def building_dat(name, images, btype="res", dims="1,1", level=1, chance=100,
                  author="", intro_year=1900, retire_year=2999,
-                 animation_time=None, waytype="", enables=()):
+                 animation_time=None, waytype="", enables=(), icon=""):
     """A compilable building .dat.
 
     btype: res | com | ind | cur (attraction) | tow (townhall) | stop | depot |
@@ -332,9 +347,15 @@ def building_dat(name, images, btype="res", dims="1,1", level=1, chance=100,
     air, ...). Empty for a plain city building - and then the output is byte-for-
     byte what it was before stops existed.
     enables: any of "pax", "post", "ware" - what a stop accepts.
+    icon: sheet reference (see icon_ref) for a stop/depot's toolbar icon. Without
+    one a player-built building has no builder and cannot be placed; a spawned
+    city building needs none, so leave it empty.
     animation_time: milliseconds per phase; only meaningful with >1 phase.
     """
     station = station_block(waytype, enables)
+    if icon:
+        station = (station + "\n" if station else "") + \
+                  "icon=%s\ncursor=%s" % (icon, icon)
     dat = _BUILDING_SKELETON.format(
         name=name, author=author, type=btype, dims=dims, level=level,
         chance=chance, intro_year=intro_year, retire_year=retire_year,

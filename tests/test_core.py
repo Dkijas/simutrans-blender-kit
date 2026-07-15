@@ -1027,19 +1027,31 @@ def test_station_and_depot_buildings():
                                     waytype="", enables=())
     check("adding stop support does not shift a plain building", plain == plain2)
 
+    icon = buildings.icon_ref("stn", place)
+    check("icon reference is the base tile", icon == "stn.0.0", icon)
+
     stop = buildings.building_dat("BKit_Stop", block, btype="stop", dims="1,1",
-                                  level=2, waytype="track", enables=["pax", "post"])
+                                  level=2, waytype="track", enables=["pax", "post"],
+                                  icon=icon)
     check("stop has type and waytype",
           "\ntype=stop\n" in stop and "\nwaytype=track\n" in stop, stop)
     check("stop enables passengers and mail",
           "\nenables_pax=1\n" in stop and "\nenables_post=1\n" in stop, stop)
+    # hausbauer.cc:235: a stop whose icon is empty gets a NULL builder and cannot
+    # be placed - the silent unbuildable trap, the same as a way with no icon
+    check("stop carries an icon, or it cannot be built",
+          "\nicon=stn.0.0\n" in stop and "\ncursor=stn.0.0\n" in stop, stop)
     check("stop lints clean", not schema.lint(stop), str(schema.lint(stop)))
 
     depot = buildings.building_dat("BKit_Depot", block, btype="depot", dims="1,1",
-                                   level=1, waytype="track")
-    check("depot has type and waytype",
-          "\ntype=depot\n" in depot and "\nwaytype=track\n" in depot, depot)
+                                   level=1, waytype="track", icon=icon)
+    check("depot has type, waytype and icon",
+          "\ntype=depot\n" in depot and "\nwaytype=track\n" in depot
+          and "\nicon=" in depot, depot)
     check("depot lints clean", not schema.lint(depot), str(schema.lint(depot)))
+
+    # and a plain building must still be byte-identical - no icon, no waytype
+    check("a plain building gets no icon", "icon=" not in plain, plain)
 
 
 def test_seasons_and_the_third_image_trap():
