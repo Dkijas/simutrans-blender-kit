@@ -25,7 +25,7 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
 
 from addon import rig                                    # noqa: E402
-from core import buildings, colors, paksets, schema, sheet   # noqa: E402
+from core import buildings, colors, factories, paksets, schema, sheet  # noqa: E402
 
 OUT = os.path.join(_ROOT, "build", "house")
 PAKSET = "pak128"
@@ -214,6 +214,24 @@ def main():
           "\nicon=" in stop_dat, stop_dat)
     check("stop dat lints clean", not schema.lint(stop_dat),
           str(schema.lint(stop_dat)))
+
+    # --- the same sprites, written as a FACTORY for the game to load. A factory
+    # is a building plus economics (factory_writer.cc embeds the building); it
+    # needs the mandatory mapcolor and a good that resolves at load.
+    fac_png = os.path.join(OUT, "bkitfactory.png")
+    fac_place = sheet.assemble(frames, pak.tile_px, cols=4, out_path=fac_png)
+    fac_dat = factories.factory_dat(
+        "BKit_Mine", buildings.image_block("bkitfactory", fac_place),
+        mapcolor=42, dims="1,1", level=1, location="Land", productivity=20,
+        outputs=[("Kohle", 40, 100)])
+    fac_path = os.path.join(OUT, "bkitfactory.dat")
+    with open(fac_path, "w", encoding="utf-8") as f:
+        f.write(fac_dat)
+    check("factory dat is an obj=factory with a mapcolor and a product",
+          "obj=factory" in fac_dat and "mapcolor=42" in fac_dat
+          and "outputgood[0]=Kohle" in fac_dat, fac_dat)
+    check("factory dat lints clean", not schema.lint(fac_dat),
+          str(schema.lint(fac_dat)))
 
     print("\nsheet: %s\ndat:   %s" % (sheet_png, dat_path))
     if FAILED:
