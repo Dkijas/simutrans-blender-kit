@@ -10,13 +10,13 @@ testable without Blender) and addon/rig.py.
 bl_info = {
     "name": "Simutrans Blender Kit",
     "author": "victor_18993",
-    "version": (0, 3, 0),
+    "version": (0, 4, 0),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar (N) > Simutrans",
     "description": "Render Simutrans vehicles, ways, catenary, buildings and signals, "
                    "and emit a compilable .dat",
     "category": "Import-Export",
-    "doc_url": "https://forum.simutrans.com/",
+    "doc_url": "https://github.com/Dkijas/simutrans-blender-kit",
 }
 
 

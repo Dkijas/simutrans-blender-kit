@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.0
+
+### Added
+
+- **Render Sheet shows progress and can be cancelled.** A vehicle render fires the
+  renderer eight times with the UI frozen and no way out. It now renders one heading
+  per tick with a progress bar and a status-bar readout (`heading N/8`), and **Esc**
+  stops it. Because the render call is itself blocking, the gain is an
+  update-and-cancel point between headings — which is where the seconds actually go.
+  A cancelled render is left on disk but not recorded, so *Write .dat* still builds
+  only from the last complete render, never half a sheet.
+
+### Changed
+
+- **CI runs the core suite on every push** (GitHub Actions, Python 3.10–3.12): the
+  ~970 Blender-free checks — projection, colours, the `.dat` linter, schema drift.
+- `doc_url` and the README now point at the GitHub repository and its releases.
+
 ## 0.3.0
 
 The release that made the kit's own claims true and closed the gaps that let
