@@ -17,8 +17,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      # The Pythons the supported Blenders actually ship: Blender 4.0 bundles 3.10,
+      # 4.1+/5.x bundle 3.11. 3.12 is included as forward cover. The core code uses
+      # PEP 604 (`str | None`) at runtime, so 3.10 is the real floor.
       matrix:
-        python-version: [ '3.9', '3.11', '3.12' ]
+        python-version: [ '3.10', '3.11', '3.12' ]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
