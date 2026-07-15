@@ -743,30 +743,55 @@ def render_directions(bpy, out_dir, pakset_name="pak128", dirs=8,
     per frame (for instance from the model's own bounding box, which changes
     shape as it turns) would let the vehicle jitter between directions - the
     kind of bug that only shows up once everything is already in the pakset.
+
+    The per-heading work lives in _render_one_direction and the setup in
+    prepare_directions, so the modal Render Sheet operator can drive the same
+    render one heading per timer tick (progress + cancel) without a second copy
+    of this loop.
     """
-    target = tile_anchor(pakset_name, align_offset)
-
-    pak = build_rig(bpy, pakset_name, distance, target=target)
-    cam = bpy.data.objects[CAM_NAME]
-    scene = bpy.context.scene
-
-    out_dir = _prepare_out(out_dir)
-    frames = []
-    for code in directions.codes_for(dirs):
-        az = directions.azimuth_deg(code)
-        cam.rotation_euler = tuple(
-            math.radians(a) for a in (projection_rot_x(), 0.0, az)
-        )
-        cam.location = _camera_location(distance, az, 30.0, target)
-        aim_sun(bpy, az)          # the sun rides with the camera, never the model
-
-        path = os.path.join(out_dir, "%s_%s.png" % (basename, code))
-        scene.render.filepath = path
-        bpy.ops.render.render(write_still=True)
-        frames.append((code, path))
-
+    plan, codes = prepare_directions(bpy, out_dir, pakset_name, dirs, basename,
+                                     distance, align_offset)
+    frames = [render_one_step(bpy, plan, code) for code in codes]
     warn_if_clipped(frames, "vehicle")
     return frames
+
+
+def prepare_directions(bpy, out_dir, pakset_name="pak128", dirs=8,
+                       basename="vehicle", distance=20.0,
+                       align_offset=(0.0, 0.0, 0.0)):
+    """Build the rig for a vehicle render. -> (plan, codes-still-to-render).
+
+    Everything render_directions does BEFORE its loop. `plan` is an opaque dict
+    the caller threads back into render_one_step; `codes` is the list of headings.
+    The aim target is baked into `plan` here, once, for the jitter reason above.
+    """
+    target = tile_anchor(pakset_name, align_offset)
+    build_rig(bpy, pakset_name, distance, target=target)
+    plan = {"cam": bpy.data.objects[CAM_NAME], "scene": bpy.context.scene,
+            "out_dir": _prepare_out(out_dir), "basename": basename,
+            "distance": distance, "target": target}
+    return plan, list(directions.codes_for(dirs))
+
+
+def render_one_step(bpy, plan, code):
+    """Render one heading of a prepared vehicle render. -> (code, png_path)."""
+    return _render_one_direction(bpy, plan, code)
+
+
+def _render_one_direction(bpy, plan, code):
+    """Pose camera and sun for one heading and render it. -> (code, png_path)."""
+    cam, scene, target = plan["cam"], plan["scene"], plan["target"]
+    az = directions.azimuth_deg(code)
+    cam.rotation_euler = tuple(
+        math.radians(a) for a in (projection_rot_x(), 0.0, az)
+    )
+    cam.location = _camera_location(plan["distance"], az, 30.0, target)
+    aim_sun(bpy, az)              # the sun rides with the camera, never the model
+
+    path = os.path.join(plan["out_dir"], "%s_%s.png" % (plan["basename"], code))
+    scene.render.filepath = path
+    bpy.ops.render.render(write_still=True)
+    return code, path
 
 
 def render_building(bpy, out_dir, pakset_name="pak128", basename="building",
