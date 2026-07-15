@@ -354,10 +354,33 @@ def main():
                       for d in ("n", "s", "w", "e")), dat)
     check("...and a green one", dat and "image[n][1]=" in dat, dat)
 
+    # --- tunnel portal, back and front layers
+    clear()
+    back = new_collection("tunnel_portal")
+    cube(x=-0.22, y=0.15, z=0.25, sx=0.12, sy=0.5, sz=0.5, collection=back)
+    cube(x=0.22, y=0.15, z=0.25, sx=0.12, sy=0.5, sz=0.5, collection=back)
+    cube(x=0.0, y=-0.3, z=0.4, sx=0.9, sy=0.4, sz=0.8, collection=back)
+    front = new_collection("tunnel_portal_front")
+    cube(x=0.0, y=0.3, z=0.48, sx=0.6, sy=0.16, sz=0.14, collection=front)
+
+    p.obj_type = "tunnel"
+    p.obj_name = "Panel_Tunnel"
+    p.waytype = "track"
+    p.topspeed = 120
+    check("the panel renders a tunnel", render(p, "ptunnel") == {"FINISHED"})
+    dat = dat_of("ptunnel")
+    check("...and writes a tunnel .dat", dat and "obj=tunnel" in dat)
+    check("...with all four back portals",
+          dat and all(("backimage[%s]=" % d) in dat for d in "nsew"), dat)
+    check("...and all four front portals",
+          dat and all(("frontimage[%s]=" % d) in dat for d in "nsew"), dat)
+    check("...and an icon, without which nobody could build it",
+          dat and "icon=" in dat, dat)
+
     # every .dat the panel wrote must lint clean - the panel lints them itself, but
     # this is the check that it is not just printing and shrugging
     from simutrans_blender_kit.core import schema
-    for basename in ("pvehicle", "pbuilding", "pway", "pwayobj", "psign"):
+    for basename in ("pvehicle", "pbuilding", "pway", "pwayobj", "psign", "ptunnel"):
         text = dat_of(basename)
         findings = schema.lint(text) if text else [1]
         check("%s.dat lints clean" % basename, not findings, str(findings))

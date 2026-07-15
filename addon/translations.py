@@ -175,11 +175,13 @@ SOURCE_STRINGS = (
     "Way",
     "Catenary",
     "Sign / Signal",
+    "Tunnel",
     "a train, a bus, a ship - 4 or 8 headings",
     "a house, a factory - turned to face its street",
     "a road, a rail - six models, sixteen images",
     "overhead line and the like, in two layers",
     "four directions, one aspect each",
+    "a portal, four directions, two layers",
     # --- building
     "Tiles east",
     "Tiles south",
@@ -226,6 +228,15 @@ SOURCE_STRINGS = (
     "edge (+Y). For a signal, put each",
     "aspect's lamp in state_0 / state_1;",
     "STATE 0 IS RED",
+    "Collection tunnel_portal on a",
+    "ramp facing NORTH, and",
+    "tunnel_portal_front for the parts",
+    "Inner way",
+    "Optional: the name of the way built inside the tunnel. It is written as a "
+    "cross-reference and must resolve to a real way at game load, so leave it "
+    "EMPTY unless you have one",
+    "No tunnel_portal collection - model the portal on a north-facing ramp and "
+    "put it in tunnel_portal",
     # --- warnings shown BEFORE the mistake is made
     "3 seasons: the engine NEVER",
     "draws the third. Use 2, 4 or 5.",
@@ -421,6 +432,7 @@ SPANISH = {
     "Way": "Vía",
     "Catenary": "Catenaria",
     "Sign / Signal": "Señal",
+    "Tunnel": "Túnel",
     "a train, a bus, a ship - 4 or 8 headings":
         "un tren, un autobús, un barco: 4 u 8 rumbos",
     "a house, a factory - turned to face its street":
@@ -430,6 +442,8 @@ SPANISH = {
     "overhead line and the like, in two layers":
         "línea aérea y similares, en dos capas",
     "four directions, one aspect each": "cuatro direcciones, un aspecto cada una",
+    "a portal, four directions, two layers":
+        "un portal, cuatro direcciones, dos capas",
 
 
     # --- building
@@ -495,6 +509,20 @@ SPANISH = {
     "edge (+Y). For a signal, put each": "casilla (+Y). Si es señal, pon el foco",
     "aspect's lamp in state_0 / state_1;": "de cada aspecto en state_0 / state_1;",
     "STATE 0 IS RED": "EL ESTADO 0 ES ROJO",
+    "Collection tunnel_portal on a": "Colección tunnel_portal en una",
+    "ramp facing NORTH, and": "rampa que mira al NORTE, y",
+    "tunnel_portal_front for the parts": "tunnel_portal_front para las partes",
+    "Inner way": "Vía interior",
+    "Optional: the name of the way built inside the tunnel. It is written as a "
+    "cross-reference and must resolve to a real way at game load, so leave it "
+    "EMPTY unless you have one":
+        "Opcional: el nombre de la vía construida dentro del túnel. Se escribe como "
+        "referencia cruzada y debe resolver a una vía real al cargar el juego, así "
+        "que déjalo VACÍO salvo que tengas una",
+    "No tunnel_portal collection - model the portal on a north-facing ramp and "
+    "put it in tunnel_portal":
+        "No hay colección tunnel_portal: modela el portal en una rampa que mira al "
+        "norte y ponlo en tunnel_portal",
 
     # --- the warnings the panel shows before you make the mistake
     "3 seasons: the engine NEVER": "3 temporadas: el motor NO dibuja",

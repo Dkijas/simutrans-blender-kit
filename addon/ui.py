@@ -75,6 +75,7 @@ class SimutransProps(PropertyGroup):
             ("way", "Way", "a road, a rail - six models, sixteen images"),
             ("wayobj", "Catenary", "overhead line and the like, in two layers"),
             ("roadsign", "Sign / Signal", "four directions, one aspect each"),
+            ("tunnel", "Tunnel", "a portal, four directions, two layers"),
         ],
         default="vehicle",
     )
@@ -173,6 +174,12 @@ class SimutransProps(PropertyGroup):
                         description="in 1/16 of a tile; 8 is half a tile")
     payload: IntProperty(name="Payload", translation_context=CTX, default=0, min=0)
     freight: StringProperty(name="Freight", translation_context=CTX, default="None")
+    tunnel_way: StringProperty(
+        name="Inner way", translation_context=CTX, default="",
+        description="Optional: the name of the way built inside the tunnel. It is "
+                    "written as a cross-reference and must resolve to a real way at "
+                    "game load, so leave it EMPTY unless you have one",
+    )
     freight_goods: StringProperty(
         name="Cargo variants", translation_context=CTX, default="",
         description="Comma-separated goods for a wagon that looks different loaded "
@@ -282,6 +289,10 @@ _MODEL_HINT = {
                  "edge (+Y). For a signal, put each",
                  "aspect's lamp in state_0 / state_1;",
                  "STATE 0 IS RED"),
+    "tunnel": ("Collection tunnel_portal on a",
+               "ramp facing NORTH, and",
+               "tunnel_portal_front for the parts",
+               "drawn OVER the vehicles"),
 }
 
 
@@ -405,6 +416,16 @@ def _render(p, out):
             state_setup=state_setup, align_offset=tuple(p.align_offset))
         record = {"obj_type": "roadsign", "frames": frames}
 
+    elif p.obj_type == "tunnel":
+        if not rig.has_tunnel_model(bpy):
+            raise ValueError(_("No tunnel_portal collection - model the portal on "
+                               "a north-facing ramp and put it in tunnel_portal"))
+        portals = rig.render_tunnel_portals(
+            bpy, out, p.pakset, basename=p.basename,
+            align_offset=tuple(p.align_offset))
+        record = {"obj_type": "tunnel", "portals": portals}
+        frames = list(portals["back"]) + list(portals.get("front", []))
+
     else:
         raise ValueError("unknown object type %r" % (p.obj_type,))
 
@@ -483,6 +504,14 @@ def _build_dat(p, out, record):
             frames, out, p.pakset, basename=p.basename, cols=4,
             waytype=p.waytype, is_signal=int(p.is_signal), cost=p.cost,
             intro_year=p.intro_year, **common)
+        return png, dat
+
+    if kind == "tunnel":
+        png, dat, _pl = rig.build_tunnel_sheet_and_dat(
+            record["portals"], out, p.pakset, basename=p.basename, cols=4,
+            waytype=p.waytype, topspeed=p.topspeed, cost=p.cost,
+            maintenance=p.maintenance, intro_year=p.intro_year,
+            way=p.tunnel_way, **common)
         return png, dat
 
     raise ValueError("unknown object type %r" % (kind,))
@@ -985,6 +1014,8 @@ _DAT_FIELDS = {
             "intro_year"),
     "wayobj": ("obj_name", "author", "waytype", "own_waytype", "topspeed", "cost",
                "maintenance", "intro_year"),
+    "tunnel": ("obj_name", "author", "waytype", "topspeed", "cost", "maintenance",
+               "intro_year", "tunnel_way"),
     "roadsign": ("obj_name", "author", "waytype", "is_signal", "states", "cost",
                  "intro_year"),
 }
