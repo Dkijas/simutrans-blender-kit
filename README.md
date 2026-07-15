@@ -1,5 +1,9 @@
 # Simutrans Blender Kit
 
+[![tests](https://github.com/Dkijas/simutrans-blender-kit/actions/workflows/tests.yml/badge.svg)](https://github.com/Dkijas/simutrans-blender-kit/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/Dkijas/simutrans-blender-kit)](https://github.com/Dkijas/simutrans-blender-kit/releases/latest)
+
 A modern **Blender 4.x/5.x** add-on that takes a 3D model and produces everything
 Simutrans needs: the 8 directional sprites, the sprite sheet, and a compilable
 `.dat` — with the reserved colours preserved byte-for-byte.
@@ -59,13 +63,16 @@ Three consequences of that rigour worth calling out:
 
 ## Install
 
-```
-python tools/build_addon_zip.py
-```
+Download **`simutrans_blender_kit.zip`** from the
+[latest release](https://github.com/Dkijas/simutrans-blender-kit/releases/latest),
+then in Blender: *Preferences → Add-ons → Install from Disk* → pick the zip. Press
+**N** in the 3D view and pick the **Simutrans** tab.
 
-Then in Blender: *Preferences → Add-ons → Install from Disk* →
-`build/simutrans_blender_kit.zip`. Press **N** in the 3D view and pick the
-**Simutrans** tab.
+To build the zip from source instead:
+
+```
+python tools/build_addon_zip.py      # writes build/simutrans_blender_kit.zip
+```
 
 Model your vehicle **standing on `z = 0`, centred on the world origin, nose along
 +X**, then: *Build Rig* → *Render Sheet* → *Check Colours* → *Compile .pak*.
@@ -118,7 +125,7 @@ examples/
 tools/
   build_addon_zip.py
 tests/
-  test_core.py         345 checks, no Blender needed
+  test_core.py         970 checks, no Blender needed
   blender_e2e.py       full pipeline inside Blender (model → sheet → .dat)
   blender_alignment.py the tile quad lands at 3/4; opposite headings match
   blender_addon.py     installs the zip and drives the panel's own buttons
@@ -510,7 +517,7 @@ All three go red.
 
 ## Status
 
-* `core` — **345 checks pass** (`python tests/test_core.py`).
+* `core` — **970 checks pass** (`python tests/test_core.py`).
 * Blender pipeline — **end-to-end green on Blender 5.1.2**
   (`blender --background --python tests/blender_e2e.py` → `E2E_OK`):
   renders 8 × 128×128 RGBA, assembles a 4×2 sheet, writes a compilable `.dat`,
