@@ -801,6 +801,36 @@ def test_linter_validates_integer_values():
                   for f in schema.lint("obj=vehicle\nname=abc123\nimage[1]=x.0.0\n")))
 
 
+def test_findings_carry_codes_and_can_be_suppressed():
+    """Every finding has a stable code, and a file can silence one by that code."""
+    from core import schema
+
+    dat = "obj=way\nname=X\nwaytype=road\nimage[-]=x.0.0\n"     # no icon
+    findings = schema.lint(dat)
+    check("the finding has a code", findings and findings[0].code == "no-icon",
+          str([(f.level, f.code) for f in findings]))
+    check("every finding carries a non-empty code",
+          all(f.code for f in findings), str(findings))
+    check("as_dict exposes it",
+          findings[0].as_dict()["code"] == "no-icon", str(findings[0].as_dict()))
+
+    silenced = schema.lint("# bkit: ignore=no-icon\n" + dat)
+    check("the ignore pragma silences that code",
+          not any(f.code == "no-icon" for f in silenced), str(silenced))
+
+    # a pragma for a DIFFERENT code leaves this one alone
+    other = schema.lint("# bkit: ignore=dup-key\n" + dat)
+    check("an unrelated ignore does not silence it",
+          any(f.code == "no-icon" for f in other), str(other))
+
+    # comma-separated, and forgiving of spacing
+    two = ("obj=way\nname=A\nwaytype=road\nimage[-]=a.0.0\n"
+           "waytype=road\n")                                     # dup + no icon
+    both = schema.lint("#  bkit: ignore = no-icon , dup-key\n" + two)
+    check("several codes can be silenced at once",
+          not both, str(both))
+
+
 def test_building_image_block():
     from core import buildings, schema
 

@@ -184,13 +184,19 @@ def types_reading(key):
 
 
 class Finding:
-    def __init__(self, level, line, message, path=None):
+    def __init__(self, level, line, message, code="", path=None):
         self.level, self.line, self.message = level, line, message
+        self.code = code              # a stable rule id, for suppression and --json
         self.path = path              # set by the cross-file passes; else None
 
     def __repr__(self):
-        return "%s:%d: %s: %s" % (self.path or "dat", self.line, self.level,
-                                  self.message)
+        tag = " [%s]" % self.code if self.code else ""
+        return "%s:%d: %s%s: %s" % (self.path or "dat", self.line, self.level,
+                                    tag, self.message)
+
+    def as_dict(self):
+        return {"file": self.path, "line": self.line, "level": self.level,
+                "code": self.code, "message": self.message}
 
 
 # BackImage[l][y][x][h][phase][season] - the six-index form
@@ -213,11 +219,11 @@ def _season_findings(seasons_seen):
                                "3 season images: the engine NEVER draws the third "
                                "(obj/gebaeude.cc effective_season - the row for 3 "
                                "is a copy of the row for 2). Use 2 (all-year + "
-                               "snow) or 4/5 (the real seasons)."))
+                               "snow) or 4/5 (the real seasons).", code="season-waste"))
         elif count > 5:
             out.append(Finding("error", line,
                                "%d season images, but the engine's table only goes "
-                               "up to 5" % count))
+                               "up to 5" % count, code="season-count"))
     return out
 
 
@@ -283,7 +289,7 @@ def _icon_findings(icon_blocks):
                                "obj=%s with no icon=. The engine only builds a tool "
                                "for it if the icon exists, so it will load, take up "
                                "space, and be IMPOSSIBLE TO BUILD - no button, no "
-                               "list, nothing. makeobj will not warn you." % obj_type))
+                               "list, nothing. makeobj will not warn you." % obj_type, code="no-icon"))
     return out
 
 
@@ -318,7 +324,7 @@ def _comment_findings(obj_type, keys, value, line):
                     "TEXT, so its value becomes %r - comment and all - and the "
                     "pakset loader will fail to resolve it. Put the comment on its "
                     "own line. (An image reference may have one; text may not.)"
-                    % (keys[0], value.strip()))]
+                    % (keys[0], value.strip()), code="value-comment")]
 
 
 # --- coupling chains --------------------------------------------------------
@@ -435,6 +441,22 @@ def lint_files(files):
     return out
 
 
+# A file-level opt-out. `# bkit: ignore=no-icon, dup-key` anywhere in the file
+# silences those rule codes for the whole file - the "I know, stop telling me"
+# escape a linter needs so people do not turn the whole thing off over one finding.
+# File-level rather than per-line because a .dat cannot carry a trailing comment on
+# most of its lines (that is itself a rule), so there is nowhere to hang a per-line
+# pragma without inventing a second comment syntax.
+_SUPPRESS = re.compile(r"#\s*bkit:\s*ignore\s*=\s*([\w\-, ]+)", re.I)
+
+
+def _suppressed_codes(text):
+    codes = set()
+    for m in _SUPPRESS.finditer(text):
+        codes.update(c.strip() for c in m.group(1).split(",") if c.strip())
+    return codes
+
+
 def lint(text):
     """-> [Finding]. level is 'error' (the game will misbehave) or 'warning'."""
     out = []
@@ -458,7 +480,7 @@ def lint(text):
             out.append(Finding("error", n,
                                "indented line: the engine DROPS any line starting "
                                "with a space, so this key is silently ignored. "
-                               "Move it to column 0."))
+                               "Move it to column 0.", code="dropped-indent"))
             continue
 
         if "=" not in raw:
@@ -484,7 +506,7 @@ def lint(text):
                 obj_type = None
             elif not OBJ_TYPES[obj_type]["top_level"]:
                 out.append(Finding("error", n, "obj=%s is an internal writer, not "
-                                   "something a .dat may declare" % obj_type))
+                                   "something a .dat may declare" % obj_type, code="internal-obj"))
                 obj_type = None
             else:
                 icon_blocks.append([obj_type, n, False])
@@ -518,7 +540,7 @@ def lint(text):
                                "the FIRST value and silently ignores this one "
                                "(tabfile.cc put()), so this line does nothing - "
                                "including if you edit it."
-                               % (dup_keys[0], first_line, first_value)))
+                               % (dup_keys[0], first_line, first_value), code="dup-key"))
             continue
         for k in expand_key(key):
             seen[k] = (n, value.strip())
@@ -533,7 +555,7 @@ def lint(text):
                                    "%s=%s is not a waytype the engine knows, and "
                                    "get_waytype() does not shrug it off - it calls "
                                    "dbg->fatal() and makeobj dies. It knows: %s"
-                                   % (key, got, ", ".join(WAYTYPES))))
+                                   % (key, got, ", ".join(WAYTYPES)), code="bad-waytype"))
 
         # A KEY THE ENGINE READS AS A NUMBER, GIVEN SOMETHING THAT IS NOT ONE.
         #
@@ -550,7 +572,7 @@ def lint(text):
                                    "%s=%s is not an integer. The engine reads it with "
                                    "atoi(), which stops at the first non-digit and "
                                    "would take this as %d - silently. makeobj will not "
-                                   "warn." % (key, val, reads)))
+                                   "warn." % (key, val, reads), code="bad-int"))
 
         # A key can stand for a whole family: image[n,e,s,w][0-1] is eight of them.
         keys = expand_key(key)
@@ -571,7 +593,7 @@ def lint(text):
             shown = key if len(keys) == 1 else "%s (e.g. %s)" % (key, unknown[0])
             out.append(Finding("warning", n,
                                "obj=%s does not read %r%s. makeobj will ignore it."
-                               % (obj_type, shown, hint)))
+                               % (obj_type, shown, hint), code="unknown-key"))
 
     for bad, (line, count) in unknown_types.items():
         more = "" if count == 1 else " (%d objects in this file)" % count
@@ -581,9 +603,14 @@ def lint(text):
                            "moves on - so a typo here does not break the build, it "
                            "just quietly leaves the object out of the pakset. The "
                            "engine knows: %s"
-                           % (bad, more, bad, ", ".join(TOP_LEVEL))))
+                           % (bad, more, bad, ", ".join(TOP_LEVEL)), code="unknown-obj"))
 
     out.extend(_season_findings(seasons))
     out.extend(_icon_findings(icon_blocks))
+
+    suppressed = _suppressed_codes(text)
+    if suppressed:
+        out = [f for f in out if f.code not in suppressed]
+
     out.sort(key=lambda f: f.line)
     return out

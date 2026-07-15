@@ -2,7 +2,12 @@
 
     python tools/lint_dat.py myvehicle.dat
     python tools/lint_dat.py pak128/vehicles/           (recurses)
+    python tools/lint_dat.py --json vehicles/           (machine-readable)
     python tools/lint_dat.py --couplings vehicles/      (see below)
+
+Each finding carries a stable CODE (no-icon, dup-key, bad-int, ...). A line
+`# bkit: ignore=no-icon, dup-key` anywhere in a .dat silences those codes for that
+file - the escape valve for a finding you have read and accept.
 
 No Blender, no dependencies - useful to anyone who writes .dat files by hand,
 which is still most of the pakset world.
@@ -26,6 +31,7 @@ sits inside the cell, so unequal lengths are not a defect - and treating them as
 one accuses 56 pieces of perfectly good pak128 art.
 """
 
+import json
 import os
 import sys
 
@@ -71,12 +77,13 @@ def couplings(texts, tile_px=128):
 
 def main(argv):
     want_couplings = "--couplings" in argv
-    argv = [a for a in argv if a != "--couplings"]
+    want_json = "--json" in argv
+    argv = [a for a in argv if a not in ("--couplings", "--json")]
     if not argv:
         print(__doc__)
         return 2
 
-    errors = warnings = 0
+    unreadable = 0
 
     texts = []
     for path in dat_files(argv):
@@ -85,19 +92,24 @@ def main(argv):
                 texts.append((path, f.read()))
         except OSError as e:
             print("%s: cannot read: %s" % (path, e))
-            errors += 1
+            unreadable += 1
 
     if want_couplings:
         couplings(texts)
         return 0
 
-    findings = schema.lint_files(texts)
-    for f in sorted(findings, key=lambda f: (f.path or "", f.line)):
-        print("%s:%d: %s: %s" % (f.path, f.line, f.level, f.message))
-        if f.level == "error":
-            errors += 1
-        else:
-            warnings += 1
+    findings = sorted(schema.lint_files(texts), key=lambda f: (f.path or "", f.line))
+    errors = sum(1 for f in findings if f.level == "error") + unreadable
+    warnings = len(findings) - sum(1 for f in findings if f.level == "error")
+
+    if want_json:
+        json.dump([f.as_dict() for f in findings], sys.stdout, indent=2)
+        sys.stdout.write("\n")
+        return 1 if errors else 0
+
+    for f in findings:
+        code = " [%s]" % f.code if f.code else ""
+        print("%s:%d: %s%s: %s" % (f.path, f.line, f.level, code, f.message))
 
     print("\n%d file(s), %d error(s), %d warning(s)   [engine %s, %d keys]"
           % (len(texts), errors, warnings, schema.ENGINE_VERSION,
