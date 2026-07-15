@@ -177,6 +177,7 @@ SOURCE_STRINGS = (
     "Sign / Signal",
     "Tunnel",
     "Bridge",
+    "Factory",
     "a train, a bus, a ship - 4 or 8 headings",
     "a house, a factory - turned to face its street",
     "a road, a rail - six models, sixteen images",
@@ -184,6 +185,22 @@ SOURCE_STRINGS = (
     "four directions, one aspect each",
     "a portal, four directions, two layers",
     "span, ramps, pillars - in two layers",
+    "a building that makes or consumes goods",
+    "Map colour",
+    "The colour the factory shows on the minimap (0-254). The engine refuses a "
+    "factory without one",
+    "Productivity",
+    "How much the factory makes per step",
+    "Location",
+    "Where the industry generator may place it",
+    "Makes",
+    "The good this factory PRODUCES (e.g. 'Kohle'). Must be a real pakset good. "
+    "Empty for a pure consumer",
+    "Output store",
+    "Storage for the produced good. Must be more than 10",
+    "Consumes",
+    "A good this factory CONSUMES (e.g. 'Eisenerz'). Must be a real pakset good. "
+    "Empty for a pure producer",
     "Max length",
     "Longest span the bridge may cross, in tiles. 0 = unlimited",
     "Max height",
@@ -248,6 +265,10 @@ SOURCE_STRINGS = (
     "the parts drawn OVER the vehicles",
     "No bridge_span collection - model the pieces in bridge_span, bridge_start, "
     "bridge_ramp, bridge_pillar",
+    "Model it like a building:",
+    "facade toward -Y, growing",
+    "east (+X) and south (-Y).",
+    "Give it a Map colour",
     "Inner way",
     "Optional: the name of the way built inside the tunnel. It is written as a "
     "cross-reference and must resolve to a real way at game load, so leave it "
@@ -451,6 +472,7 @@ SPANISH = {
     "Sign / Signal": "Señal",
     "Tunnel": "Túnel",
     "Bridge": "Puente",
+    "Factory": "Fábrica",
     "a train, a bus, a ship - 4 or 8 headings":
         "un tren, un autobús, un barco: 4 u 8 rumbos",
     "a house, a factory - turned to face its street":
@@ -464,6 +486,31 @@ SPANISH = {
         "un portal, cuatro direcciones, dos capas",
     "span, ramps, pillars - in two layers":
         "vano, rampas, pilares: en dos capas",
+    "a building that makes or consumes goods":
+        "un edificio que produce o consume mercancías",
+    "Map colour": "Color en el mapa",
+    "The colour the factory shows on the minimap (0-254). The engine refuses a "
+    "factory without one":
+        "El color con que la fábrica aparece en el minimapa (0-254). El motor "
+        "rechaza una fábrica sin él",
+    "Productivity": "Productividad",
+    "How much the factory makes per step": "Cuánto produce la fábrica por paso",
+    "Location": "Ubicación",
+    "Where the industry generator may place it":
+        "Dónde puede colocarla el generador de industrias",
+    "Makes": "Produce",
+    "The good this factory PRODUCES (e.g. 'Kohle'). Must be a real pakset good. "
+    "Empty for a pure consumer":
+        "La mercancía que esta fábrica PRODUCE (p. ej. 'Kohle'). Debe ser una "
+        "mercancía real del pakset. Vacío para una consumidora pura",
+    "Output store": "Almacén de salida",
+    "Storage for the produced good. Must be more than 10":
+        "Almacenamiento de la mercancía producida. Debe ser mayor que 10",
+    "Consumes": "Consume",
+    "A good this factory CONSUMES (e.g. 'Eisenerz'). Must be a real pakset good. "
+    "Empty for a pure producer":
+        "Una mercancía que esta fábrica CONSUME (p. ej. 'Eisenerz'). Debe ser una "
+        "mercancía real del pakset. Vacío para una productora pura",
     "Max length": "Longitud máx.",
     "Longest span the bridge may cross, in tiles. 0 = unlimited":
         "El vano más largo que el puente puede cruzar, en casillas. 0 = sin límite",
@@ -552,6 +599,10 @@ SPANISH = {
     "bridge_ramp, bridge_pillar":
         "No hay colección bridge_span: modela las piezas en bridge_span, "
         "bridge_start, bridge_ramp, bridge_pillar",
+    "Model it like a building:": "Modélala como un edificio:",
+    "facade toward -Y, growing": "fachada hacia -Y, creciendo",
+    "east (+X) and south (-Y).": "al este (+X) y al sur (-Y).",
+    "Give it a Map colour": "Dale un Color en el mapa",
     "Inner way": "Vía interior",
     "Optional: the name of the way built inside the tunnel. It is written as a "
     "cross-reference and must resolve to a real way at game load, so leave it "

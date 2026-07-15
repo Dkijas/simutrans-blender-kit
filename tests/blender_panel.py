@@ -449,11 +449,33 @@ def main():
     check("...and an icon, without which nobody could build it",
           dat and "\nicon=" in dat, dat)
 
+    # --- factory: a building with a map colour and a product
+    clear()
+    cube(sz=0.9)
+    p.obj_type = "factory"
+    p.obj_name = "Panel_Mine"
+    p.size_x, p.size_y, p.level = 1, 1, 1
+    p.seasons, p.phases = 1, 1
+    p.factory_mapcolor = 42
+    p.factory_location = "Land"
+    p.factory_productivity = 20
+    p.factory_output_good = "Kohle"
+    p.factory_output_capacity = 40
+    p.factory_input_good = ""
+    check("the panel renders a factory", render(p, "pfactory") == {"FINISHED"})
+    dat = dat_of("pfactory")
+    check("...and writes an obj=factory", dat and "obj=factory" in dat)
+    check("...with the mandatory map colour", dat and "\nmapcolor=42\n" in dat, dat)
+    check("...that produces its good",
+          dat and "outputgood[0]=Kohle" in dat and "outputcapacity[0]=40" in dat, dat)
+    check("...and the embedded building images",
+          dat and "BackImage[0][0][0][0][0]=" in dat, dat)
+
     # every .dat the panel wrote must lint clean - the panel lints them itself, but
     # this is the check that it is not just printing and shrugging
     from simutrans_blender_kit.core import schema
     for basename in ("pvehicle", "pbuilding", "pstop", "pdepot", "phouse2",
-                     "pway", "pwayobj", "psign", "ptunnel", "pbridge"):
+                     "pway", "pwayobj", "psign", "ptunnel", "pbridge", "pfactory"):
         text = dat_of(basename)
         findings = schema.lint(text) if text else [1]
         check("%s.dat lints clean" % basename, not findings, str(findings))

@@ -26,10 +26,10 @@ from bpy.types import Operator, Panel, PropertyGroup
 
 try:
     from . import rig, translations
-    from ..core import buildings, colors, night, paksets, schema, sheet
+    from ..core import buildings, colors, factories, night, paksets, schema, sheet
 except ImportError:                                   # running from a checkout
     from addon import rig, translations
-    from core import buildings, colors, night, paksets, schema, sheet
+    from core import buildings, colors, factories, night, paksets, schema, sheet
 
 CTX = translations.CONTEXT
 
@@ -77,6 +77,7 @@ class SimutransProps(PropertyGroup):
             ("roadsign", "Sign / Signal", "four directions, one aspect each"),
             ("tunnel", "Tunnel", "a portal, four directions, two layers"),
             ("bridge", "Bridge", "span, ramps, pillars - in two layers"),
+            ("factory", "Factory", "a building that makes or consumes goods"),
         ],
         default="vehicle",
     )
@@ -184,6 +185,30 @@ class SimutransProps(PropertyGroup):
                         description="in 1/16 of a tile; 8 is half a tile")
     payload: IntProperty(name="Payload", translation_context=CTX, default=0, min=0)
     freight: StringProperty(name="Freight", translation_context=CTX, default="None")
+    factory_mapcolor: IntProperty(
+        name="Map colour", translation_context=CTX, default=1, min=0, max=254,
+        description="The colour the factory shows on the minimap (0-254). The "
+                    "engine refuses a factory without one")
+    factory_productivity: IntProperty(
+        name="Productivity", translation_context=CTX, default=10, min=0,
+        description="How much the factory makes per step")
+    factory_location: EnumProperty(
+        name="Location", translation_context=CTX,
+        items=[(t, t, "") for t in ("Land", "water", "city", "river", "shore",
+                                    "forest")],
+        default="Land",
+        description="Where the industry generator may place it")
+    factory_output_good: StringProperty(
+        name="Makes", translation_context=CTX, default="",
+        description="The good this factory PRODUCES (e.g. 'Kohle'). Must be a real "
+                    "pakset good. Empty for a pure consumer")
+    factory_output_capacity: IntProperty(
+        name="Output store", translation_context=CTX, default=40, min=11,
+        description="Storage for the produced good. Must be more than 10")
+    factory_input_good: StringProperty(
+        name="Consumes", translation_context=CTX, default="",
+        description="A good this factory CONSUMES (e.g. 'Eisenerz'). Must be a real "
+                    "pakset good. Empty for a pure producer")
     max_length: IntProperty(
         name="Max length", translation_context=CTX, default=0, min=0,
         description="Longest span the bridge may cross, in tiles. 0 = unlimited")
@@ -316,6 +341,10 @@ _MODEL_HINT = {
                "bridge_start, bridge_ramp,",
                "bridge_pillar, and a _front for",
                "the parts drawn OVER the vehicles"),
+    "factory": ("Model it like a building:",
+                "facade toward -Y, growing",
+                "east (+X) and south (-Y).",
+                "Give it a Map colour"),
 }
 
 
@@ -460,6 +489,14 @@ def _render(p, out):
         record = {"obj_type": "bridge", "pieces": pieces}
         frames = [f for grp in pieces["back"].values() for f in grp]
 
+    elif p.obj_type == "factory":
+        # A factory IS a building - same render, different .dat (obj=factory).
+        frames = rig.render_building(
+            bpy, out, p.pakset, basename=p.basename,
+            size_x=p.size_x, size_y=p.size_y, layouts=1,
+            align_offset=tuple(p.align_offset))
+        record = {"obj_type": "factory", "frames": frames}
+
     else:
         raise ValueError("unknown object type %r" % (p.obj_type,))
 
@@ -563,6 +600,25 @@ def _build_dat(p, out, record):
             maintenance=p.maintenance, intro_year=p.intro_year,
             max_length=p.max_length, max_height=p.max_height,
             pillar_distance=p.pillar_distance, **common)
+        return png, dat
+
+    if kind == "factory":
+        pak = paksets.get(p.pakset)
+        png = os.path.join(out, "%s.png" % p.basename)
+        placement = sheet.assemble(frames, pak.tile_px, cols=4, out_path=png)
+        outputs = ([(p.factory_output_good, p.factory_output_capacity, 100)]
+                   if p.factory_output_good else [])
+        inputs = ([(p.factory_input_good, 1, 40, 100)]
+                  if p.factory_input_good else [])
+        text = factories.factory_dat(
+            images=buildings.image_block(p.basename, placement),
+            mapcolor=p.factory_mapcolor, dims="%d,%d" % (p.size_x, p.size_y),
+            level=p.level, location=p.factory_location,
+            productivity=p.factory_productivity,
+            outputs=outputs, inputs=inputs, **common)
+        dat = os.path.join(out, "%s.dat" % p.basename)
+        with open(dat, "w", encoding="utf-8") as f:
+            f.write(text)
         return png, dat
 
     raise ValueError("unknown object type %r" % (kind,))
@@ -1070,6 +1126,10 @@ _DAT_FIELDS = {
                "intro_year", "tunnel_way"),
     "bridge": ("obj_name", "author", "waytype", "topspeed", "cost", "maintenance",
                "intro_year", "max_length", "max_height", "pillar_distance"),
+    "factory": ("obj_name", "author", "size_x", "size_y", "level",
+                "factory_mapcolor", "factory_location", "factory_productivity",
+                "factory_output_good", "factory_output_capacity",
+                "factory_input_good"),
     "roadsign": ("obj_name", "author", "waytype", "is_signal", "states", "cost",
                  "intro_year"),
 }
