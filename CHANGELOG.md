@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.6.0
+
+The release that finished the object types: everything a pakset is built from can
+now come out of the kit.
+
+### Added — four new object types
+
+- **Tunnels.** A portal in four directions and two layers (back behind the
+  vehicle, front over it), modelled on a north-facing ramp in `tunnel_portal` /
+  `tunnel_portal_front`. Grounded in `tunnel_writer.cc` and the engine's
+  `slope_indices`; the mandatory icon is emitted (without it the engine gives the
+  tunnel no builder). Verified buildable in the running game.
+
+- **Stations and depots.** A stop, a depot or an extension is a building with a
+  `type`, a `waytype` and — because a player places it — an icon, without which
+  `hausbauer.cc` gives it no builder and it silently cannot be built. Pick the kind
+  and set what it accepts (passengers, mail, goods). Verified: the stop turns up in
+  the engine's own station builder list.
+
+- **Bridges.** The four image groups the engine reads — span (ns/ew), start and
+  ramp (n/s/e/w), pillar (s/w) — each in a back and an optional front layer, plus
+  the length, height and pillar-spacing limits. Modelled in `bridge_span`,
+  `bridge_start`, `bridge_ramp`, `bridge_pillar`. Verified buildable in game.
+
+- **Factories.** A building plus its economics in one `obj=factory`: the mandatory
+  minimap colour, productivity, location, and the goods it makes or consumes (each
+  a cross-reference that must resolve at load). The sprites are the ordinary
+  building render. Verified: the factory loads with its good resolved and appears
+  in the engine's factory table.
+
+Every one is grounded in the engine's own writers, checked against makeobj (which
+fatals on a missing `freightimagetype`, `mapcolor` or icon), rendered and pixel-
+checked in Blender, and loaded in the running engine. One caveat held honestly: the
+exact portal/piece-on-which-hill mapping for tunnels and bridges is derived from
+the engine's slope tables but is the reflection the way slopes proved you confirm
+by eye in a windowed game, not headless — the pieces are verified buildable; their
+per-slope orientation is the one thing a headless run cannot see.
+
+### Note
+
+Cargo variants (freight images) shipped in 0.5.0.
+
 ## 0.5.0
 
 ### Added
