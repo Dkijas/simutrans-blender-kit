@@ -76,6 +76,7 @@ class SimutransProps(PropertyGroup):
             ("wayobj", "Catenary", "overhead line and the like, in two layers"),
             ("roadsign", "Sign / Signal", "four directions, one aspect each"),
             ("tunnel", "Tunnel", "a portal, four directions, two layers"),
+            ("bridge", "Bridge", "span, ramps, pillars - in two layers"),
         ],
         default="vehicle",
     )
@@ -183,6 +184,15 @@ class SimutransProps(PropertyGroup):
                         description="in 1/16 of a tile; 8 is half a tile")
     payload: IntProperty(name="Payload", translation_context=CTX, default=0, min=0)
     freight: StringProperty(name="Freight", translation_context=CTX, default="None")
+    max_length: IntProperty(
+        name="Max length", translation_context=CTX, default=0, min=0,
+        description="Longest span the bridge may cross, in tiles. 0 = unlimited")
+    max_height: IntProperty(
+        name="Max height", translation_context=CTX, default=4, min=1,
+        description="How high above the ground the bridge may be built")
+    pillar_distance: IntProperty(
+        name="Pillar every", translation_context=CTX, default=0, min=0,
+        description="Place a pillar every N tiles. 0 = no pillars")
     tunnel_way: StringProperty(
         name="Inner way", translation_context=CTX, default="",
         description="Optional: the name of the way built inside the tunnel. It is "
@@ -302,6 +312,10 @@ _MODEL_HINT = {
                "ramp facing NORTH, and",
                "tunnel_portal_front for the parts",
                "drawn OVER the vehicles"),
+    "bridge": ("Collections bridge_span,",
+               "bridge_start, bridge_ramp,",
+               "bridge_pillar, and a _front for",
+               "the parts drawn OVER the vehicles"),
 }
 
 
@@ -435,6 +449,17 @@ def _render(p, out):
         record = {"obj_type": "tunnel", "portals": portals}
         frames = list(portals["back"]) + list(portals.get("front", []))
 
+    elif p.obj_type == "bridge":
+        if not rig.has_bridge_model(bpy):
+            raise ValueError(_("No bridge_span collection - model the pieces in "
+                               "bridge_span, bridge_start, bridge_ramp, "
+                               "bridge_pillar"))
+        pieces = rig.render_bridge_pieces(
+            bpy, out, p.pakset, basename=p.basename,
+            align_offset=tuple(p.align_offset))
+        record = {"obj_type": "bridge", "pieces": pieces}
+        frames = [f for grp in pieces["back"].values() for f in grp]
+
     else:
         raise ValueError("unknown object type %r" % (p.obj_type,))
 
@@ -529,6 +554,15 @@ def _build_dat(p, out, record):
             waytype=p.waytype, topspeed=p.topspeed, cost=p.cost,
             maintenance=p.maintenance, intro_year=p.intro_year,
             way=p.tunnel_way, **common)
+        return png, dat
+
+    if kind == "bridge":
+        png, dat, _pl = rig.build_bridge_sheet_and_dat(
+            record["pieces"], out, p.pakset, basename=p.basename, cols=4,
+            waytype=p.waytype, topspeed=p.topspeed, cost=p.cost,
+            maintenance=p.maintenance, intro_year=p.intro_year,
+            max_length=p.max_length, max_height=p.max_height,
+            pillar_distance=p.pillar_distance, **common)
         return png, dat
 
     raise ValueError("unknown object type %r" % (kind,))
@@ -1034,6 +1068,8 @@ _DAT_FIELDS = {
                "maintenance", "intro_year"),
     "tunnel": ("obj_name", "author", "waytype", "topspeed", "cost", "maintenance",
                "intro_year", "tunnel_way"),
+    "bridge": ("obj_name", "author", "waytype", "topspeed", "cost", "maintenance",
+               "intro_year", "max_length", "max_height", "pillar_distance"),
     "roadsign": ("obj_name", "author", "waytype", "is_signal", "states", "cost",
                  "intro_year"),
 }

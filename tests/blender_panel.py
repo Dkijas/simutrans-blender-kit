@@ -416,11 +416,44 @@ def main():
     check("...and an icon, without which nobody could build it",
           dat and "icon=" in dat, dat)
 
+    # --- bridge: span, start, ramp, pillar, some with a front layer
+    clear()
+    span = new_collection("bridge_span")
+    cube(x=0.0, y=0.05, z=0.5, sx=0.5, sy=1.0, sz=0.12, collection=span)
+    spanf = new_collection("bridge_span_front")
+    cube(x=0.28, y=0.05, z=0.62, sx=0.5, sy=1.0, sz=0.1, collection=spanf)
+    start = new_collection("bridge_start")
+    cube(x=0.0, y=0.3, z=0.25, sx=0.6, sy=0.4, sz=0.5, collection=start)
+    ramp = new_collection("bridge_ramp")
+    cube(x=0.0, y=0.2, z=0.4, sx=0.5, sy=0.9, sz=0.4, collection=ramp)
+    pillar = new_collection("bridge_pillar")
+    cube(x=0.0, y=0.15, z=-0.9, sx=0.18, sy=0.18, sz=0.9, collection=pillar)
+
+    p.obj_type = "bridge"
+    p.obj_name = "Panel_Bridge"
+    p.waytype = "track"
+    p.topspeed = 80
+    p.max_length = 8
+    p.pillar_distance = 2
+    check("the panel renders a bridge", render(p, "pbridge") == {"FINISHED"})
+    dat = dat_of("pbridge")
+    check("...and writes a bridge .dat", dat and "obj=bridge" in dat)
+    check("...with the span both ways",
+          dat and "backimage[ns]=" in dat and "backimage[ew]=" in dat, dat)
+    check("...all four ramps and both pillars",
+          dat and all(("backramp[%s]=" % d) in dat for d in "nsew")
+          and "backpillar[s]=" in dat, dat)
+    check("...the span front railing", dat and "frontimage[ns]=" in dat, dat)
+    check("...and the length/pillar limits",
+          dat and "max_length=8" in dat and "pillar_distance=2" in dat, dat)
+    check("...and an icon, without which nobody could build it",
+          dat and "\nicon=" in dat, dat)
+
     # every .dat the panel wrote must lint clean - the panel lints them itself, but
     # this is the check that it is not just printing and shrugging
     from simutrans_blender_kit.core import schema
     for basename in ("pvehicle", "pbuilding", "pstop", "pdepot", "phouse2",
-                     "pway", "pwayobj", "psign", "ptunnel"):
+                     "pway", "pwayobj", "psign", "ptunnel", "pbridge"):
         text = dat_of(basename)
         findings = schema.lint(text) if text else [1]
         check("%s.dat lints clean" % basename, not findings, str(findings))

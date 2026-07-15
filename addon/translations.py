@@ -176,12 +176,20 @@ SOURCE_STRINGS = (
     "Catenary",
     "Sign / Signal",
     "Tunnel",
+    "Bridge",
     "a train, a bus, a ship - 4 or 8 headings",
     "a house, a factory - turned to face its street",
     "a road, a rail - six models, sixteen images",
     "overhead line and the like, in two layers",
     "four directions, one aspect each",
     "a portal, four directions, two layers",
+    "span, ramps, pillars - in two layers",
+    "Max length",
+    "Longest span the bridge may cross, in tiles. 0 = unlimited",
+    "Max height",
+    "How high above the ground the bridge may be built",
+    "Pillar every",
+    "Place a pillar every N tiles. 0 = no pillars",
     # --- building
     "Tiles east",
     "Tiles south",
@@ -234,6 +242,12 @@ SOURCE_STRINGS = (
     "Collection tunnel_portal on a",
     "ramp facing NORTH, and",
     "tunnel_portal_front for the parts",
+    "Collections bridge_span,",
+    "bridge_start, bridge_ramp,",
+    "bridge_pillar, and a _front for",
+    "the parts drawn OVER the vehicles",
+    "No bridge_span collection - model the pieces in bridge_span, bridge_start, "
+    "bridge_ramp, bridge_pillar",
     "Inner way",
     "Optional: the name of the way built inside the tunnel. It is written as a "
     "cross-reference and must resolve to a real way at game load, so leave it "
@@ -436,6 +450,7 @@ SPANISH = {
     "Catenary": "Catenaria",
     "Sign / Signal": "Señal",
     "Tunnel": "Túnel",
+    "Bridge": "Puente",
     "a train, a bus, a ship - 4 or 8 headings":
         "un tren, un autobús, un barco: 4 u 8 rumbos",
     "a house, a factory - turned to face its street":
@@ -447,6 +462,17 @@ SPANISH = {
     "four directions, one aspect each": "cuatro direcciones, un aspecto cada una",
     "a portal, four directions, two layers":
         "un portal, cuatro direcciones, dos capas",
+    "span, ramps, pillars - in two layers":
+        "vano, rampas, pilares: en dos capas",
+    "Max length": "Longitud máx.",
+    "Longest span the bridge may cross, in tiles. 0 = unlimited":
+        "El vano más largo que el puente puede cruzar, en casillas. 0 = sin límite",
+    "Max height": "Altura máx.",
+    "How high above the ground the bridge may be built":
+        "A qué altura sobre el suelo puede construirse el puente",
+    "Pillar every": "Pilar cada",
+    "Place a pillar every N tiles. 0 = no pillars":
+        "Coloca un pilar cada N casillas. 0 = sin pilares",
 
 
     # --- building
@@ -518,6 +544,14 @@ SPANISH = {
     "Collection tunnel_portal on a": "Colección tunnel_portal en una",
     "ramp facing NORTH, and": "rampa que mira al NORTE, y",
     "tunnel_portal_front for the parts": "tunnel_portal_front para las partes",
+    "Collections bridge_span,": "Colecciones bridge_span,",
+    "bridge_start, bridge_ramp,": "bridge_start, bridge_ramp,",
+    "bridge_pillar, and a _front for": "bridge_pillar, y un _front para",
+    "the parts drawn OVER the vehicles": "las partes dibujadas SOBRE los vehículos",
+    "No bridge_span collection - model the pieces in bridge_span, bridge_start, "
+    "bridge_ramp, bridge_pillar":
+        "No hay colección bridge_span: modela las piezas en bridge_span, "
+        "bridge_start, bridge_ramp, bridge_pillar",
     "Inner way": "Vía interior",
     "Optional: the name of the way built inside the tunnel. It is written as a "
     "cross-reference and must resolve to a real way at game load, so leave it "
