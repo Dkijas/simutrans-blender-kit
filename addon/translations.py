@@ -185,6 +185,9 @@ SOURCE_STRINGS = (
     # --- building
     "Tiles east",
     "Tiles south",
+    "Accepts passengers",
+    "Accepts mail",
+    "Accepts goods",
     "Layouts",
     "How many ways round it can be built. 0 lets the engine decide: 1 for a square "
     "footprint, 2 otherwise",
@@ -449,6 +452,9 @@ SPANISH = {
     # --- building
     "Tiles east": "Casillas al este",
     "Tiles south": "Casillas al sur",
+    "Accepts passengers": "Acepta pasajeros",
+    "Accepts mail": "Acepta correo",
+    "Accepts goods": "Acepta mercancías",
     "Layouts": "Orientaciones",
     "How many ways round it can be built. 0 lets the engine decide: 1 for a square "
     "footprint, 2 otherwise":

@@ -92,7 +92,8 @@ class SimutransProps(PropertyGroup):
     )
     btype: EnumProperty(
         name="Kind", translation_context=CTX,
-        items=[(t, t, "") for t in ("res", "com", "ind", "cur", "tow")],
+        items=[(t, t, "") for t in ("res", "com", "ind", "cur", "tow",
+                                    "stop", "depot", "extension")],
         default="res",
     )
     level: IntProperty(name="Level", translation_context=CTX, default=1, min=1,
@@ -101,6 +102,14 @@ class SimutransProps(PropertyGroup):
     chance: IntProperty(name="Chance", translation_context=CTX, default=100,
                         min=0, max=100,
                         description="how often a city picks this house; 0 = never")
+    # For a stop / depot / extension building (Kind), which its waytype field
+    # already covers. A stop that enables nothing accepts nobody.
+    enables_pax: BoolProperty(name="Accepts passengers", translation_context=CTX,
+                              default=False)
+    enables_post: BoolProperty(name="Accepts mail", translation_context=CTX,
+                               default=False)
+    enables_ware: BoolProperty(name="Accepts goods", translation_context=CTX,
+                               default=False)
     seasons: IntProperty(
         name="Seasons", translation_context=CTX, default=1, min=1, max=5,
         description="1, 2, 4 or 5 - never 3, the engine NEVER draws the third "
@@ -469,10 +478,17 @@ def _build_dat(p, out, record):
         png = os.path.join(out, "%s.png" % p.basename)
         placement = sheet.assemble(frames, pak.tile_px, cols=4, out_path=png)
         n_layouts = buildings.layouts_for(p.size_x, p.size_y, p.layouts or None)
+        # waytype and enables belong to a stop/depot/extension only; a plain house
+        # must not pick up a waytype left over from an earlier way render.
+        is_station = p.btype in ("stop", "depot", "extension")
+        enables = [e for e, on in (("pax", p.enables_pax), ("post", p.enables_post),
+                                   ("ware", p.enables_ware)) if on]
         text = buildings.building_dat(
             images=buildings.image_block(p.basename, placement),
             btype=p.btype, dims="%d,%d,%d" % (p.size_x, p.size_y, n_layouts),
             level=p.level, chance=p.chance, intro_year=p.intro_year,
+            waytype=p.waytype if is_station else "",
+            enables=enables if is_station else (),
             animation_time=(buildings.DEFAULT_ANIMATION_TIME_MS
                             if p.phases > 1 else None),
             **common)
@@ -1008,7 +1024,8 @@ _DAT_FIELDS = {
                 "weight", "length", "freight", "payload", "freight_goods",
                 "cost", "runningcost", "intro_year",
                 "constraint_prev", "constraint_next"),
-    "building": ("obj_name", "author", "btype", "size_x", "size_y", "layouts",
+    "building": ("obj_name", "author", "btype", "waytype", "enables_pax",
+                 "enables_post", "enables_ware", "size_x", "size_y", "layouts",
                  "level", "chance", "seasons", "phases", "intro_year"),
     "way": ("obj_name", "author", "waytype", "topspeed", "cost", "maintenance",
             "intro_year"),

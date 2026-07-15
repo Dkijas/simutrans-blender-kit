@@ -283,6 +283,43 @@ def main():
           dat and "BackImage[0][0][0][0][1][0]=" in dat, dat)
     check("...and an animation_time", dat and "animation_time=" in dat, dat)
 
+    # --- a station stop: a building with a type and a waytype
+    clear()
+    cube(sz=0.6)
+    p.obj_type = "building"
+    p.obj_name = "Panel_Stop"
+    p.btype = "stop"
+    p.size_x, p.size_y, p.layouts = 1, 1, 1
+    p.level = 2
+    p.seasons, p.phases = 1, 1
+    p.waytype = "track"
+    p.enables_pax = True
+    p.enables_post = True
+    check("the panel renders a station stop", render(p, "pstop") == {"FINISHED"})
+    dat = dat_of("pstop")
+    check("...as a stop with a waytype",
+          dat and "\ntype=stop\n" in dat and "\nwaytype=track\n" in dat, dat)
+    check("...that accepts passengers and mail",
+          dat and "enables_pax=1" in dat and "enables_post=1" in dat, dat)
+
+    # --- a depot: a house's waytype must NOT leak into it, and back to a house
+    p.obj_name = "Panel_Depot"
+    p.btype = "depot"
+    p.enables_pax = p.enables_post = False
+    check("the panel renders a depot", render(p, "pdepot") == {"FINISHED"})
+    dat = dat_of("pdepot")
+    check("...as a depot with a waytype",
+          dat and "\ntype=depot\n" in dat and "\nwaytype=track\n" in dat, dat)
+
+    # a plain house rendered right after must NOT carry the stop's waytype
+    p.obj_name = "Panel_PlainHouse"
+    p.btype = "res"
+    check("the panel renders a plain house after a station",
+          render(p, "phouse2") == {"FINISHED"})
+    dat = dat_of("phouse2")
+    check("...and the house has no leftover waytype",
+          dat and "type=res" in dat and "waytype=" not in dat, dat)
+
     # --- way, from the six collections
     clear()
     from simutrans_blender_kit.core import ways      # the INSTALLED copy
@@ -380,7 +417,8 @@ def main():
     # every .dat the panel wrote must lint clean - the panel lints them itself, but
     # this is the check that it is not just printing and shrugging
     from simutrans_blender_kit.core import schema
-    for basename in ("pvehicle", "pbuilding", "pway", "pwayobj", "psign", "ptunnel"):
+    for basename in ("pvehicle", "pbuilding", "pstop", "pdepot", "phouse2",
+                     "pway", "pwayobj", "psign", "ptunnel"):
         text = dat_of(basename)
         findings = schema.lint(text) if text else [1]
         check("%s.dat lints clean" % basename, not findings, str(findings))
