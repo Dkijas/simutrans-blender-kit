@@ -120,6 +120,40 @@ def main():
           "%.6f" % math.degrees(cam.rotation_euler[0]))
     check("alpha film on", bpy.context.scene.render.film_transparent)
 
+    # The engine is pinned, not inherited: the same .blend under Cycles and under
+    # EEVEE gives different sprites, and build_rig must decide which.
+    check("render engine is pinned to EEVEE",
+          bpy.context.scene.render.engine.startswith("BLENDER_EEVEE"),
+          bpy.context.scene.render.engine)
+
+    # Tone mapping is OFF, and this is the setting that used to fail in silence.
+    vt = bpy.context.scene.view_settings.view_transform
+    check("tone mapping is off (raw view transform)",
+          vt in rig._RAW_VIEW_TRANSFORMS, "view transform is %r" % vt)
+
+    # And it must RECOVER rather than render wrong. The view_transform enum is a
+    # dynamic one that reflection reports as just ['NONE'], but the names in the
+    # OCIO config can still be set directly - the default really is AgX - so force a
+    # tone-mapping transform by name and check _fix_colour_management undoes it.
+    vs = bpy.context.scene.view_settings
+    forced = None
+    for name in ("AgX", "Filmic", "Khronos PBR Neutral"):
+        try:
+            vs.view_transform = name
+            forced = name
+            break
+        except TypeError:
+            continue
+    check("a tone-mapping transform could be forced, to test recovery",
+          forced is not None, "none of AgX/Filmic/PBR exist to force")
+    if forced:
+        check("...and it really was on before the fix",
+              vs.view_transform not in rig._RAW_VIEW_TRANSFORMS, vs.view_transform)
+        rig._fix_colour_management(bpy.context.scene)
+        check("build_rig turns a forced %s back off" % forced,
+              vs.view_transform in rig._RAW_VIEW_TRANSFORMS,
+              "left it on %r" % vs.view_transform)
+
     sheet_png, dat_path, placement = rig.build_sheet_and_dat(
         frames, OUT, PAKSET, basename="testloco", cols=4,
         name="Test_Loco", waytype="track", power=1500, speed=140,

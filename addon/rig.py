@@ -354,25 +354,71 @@ def build_rig(bpy, pakset_name="pak128", distance=20.0, target=None):
         if prop.identifier.startswith("use_stamp") and prop.type == "BOOLEAN":
             setattr(r, prop.identifier, False)
 
-    # CRITICAL for special colours.
+    # THE ENGINE, PINNED.
     #
-    # Blender's default view transform (AgX/Filmic) tone-maps every pixel. A
-    # player-colour blue painted as exactly (96,132,167) comes out as something
-    # else entirely, and the engine - which matches reserved colours EXACTLY -
-    # then fails to recolour it. This is precisely why the legacy pak128.Britain
-    # script rendered special colours as separate shadeless masks.
-    #
-    # 'Standard' means "what you set is what you get", which is the only sane
-    # basis for a palette-exact pipeline.
-    try:
-        scene.view_settings.view_transform = "Standard"
-        scene.view_settings.look = "None"
-        scene.view_settings.exposure = 0.0
-        scene.view_settings.gamma = 1.0
-    except (AttributeError, TypeError):
-        pass
+    # The same .blend rendered under Cycles and under EEVEE gives DIFFERENT sprites,
+    # and nothing here used to say which one. Whatever the artist's default was, the
+    # sheet came out of it. EEVEE is the right one for flat, emission-driven,
+    # palette-exact art - and it is always present - so it is chosen explicitly
+    # rather than inherited. Its identifier changed across Blender versions
+    # (BLENDER_EEVEE, then _NEXT), so pick the first that this build actually offers.
+    engines = [e.identifier for e in
+               r.bl_rna.properties["engine"].enum_items]
+    for wanted in ("BLENDER_EEVEE", "BLENDER_EEVEE_NEXT"):
+        if wanted in engines:
+            r.engine = wanted
+            break
+    else:
+        raise RuntimeError(
+            "no EEVEE render engine in this Blender (has: %s). The kit renders flat "
+            "emission art and needs it." % ", ".join(engines))
 
+    _fix_colour_management(scene)
     return pak
+
+
+# View transforms that leave a pixel ALONE - what you set is what the file gets.
+# Everything else (AgX, Filmic, False Color, Khronos PBR Neutral) tone-maps, and a
+# player-colour blue that has been tone-mapped is not a player colour any more.
+_RAW_VIEW_TRANSFORMS = ("Standard", "Raw", "None", "NONE")
+
+
+def _fix_colour_management(scene):
+    """Make the render palette-exact, and REFUSE to render if it cannot be.
+
+    This is the single most important setting in the kit and it used to be wrapped
+    in try/except: pass. If Blender's default view transform (AgX/Filmic) could not
+    be turned off, the whole pipeline ran on it in silence - every reserved colour
+    tone-mapped into something the engine will not recolour - and the panel still
+    said "Rendered". A silently wrong sprite is worse than an error.
+
+    So: set it, then VERIFY it took. A value Blender rejected, or a config that has
+    no untransformed option at all, raises here instead of shipping wrong colour.
+    """
+    vs = scene.view_settings
+    for wanted in _RAW_VIEW_TRANSFORMS:
+        try:
+            vs.view_transform = wanted
+            break
+        except TypeError:
+            continue          # not in this OCIO config; try the next name
+
+    if vs.view_transform not in _RAW_VIEW_TRANSFORMS:
+        raise RuntimeError(
+            "cannot switch off tone mapping: view transform is %r and this Blender's "
+            "colour config offers none of %s. Reserved colours would be mangled and "
+            "the engine would not recolour them - refusing to render rather than "
+            "produce silently wrong sprites."
+            % (vs.view_transform, ", ".join(_RAW_VIEW_TRANSFORMS)))
+
+    # These are belt-and-braces on top of a raw transform; not every config has
+    # every one, and a missing look/exposure/gamma is not fatal the way the
+    # transform is.
+    for attr, value in (("look", "None"), ("exposure", 0.0), ("gamma", 1.0)):
+        try:
+            setattr(vs, attr, value)
+        except (AttributeError, TypeError):
+            pass
 
 
 def srgb_to_linear(c: float) -> float:
