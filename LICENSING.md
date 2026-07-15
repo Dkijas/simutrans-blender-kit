@@ -33,18 +33,28 @@ Two things worth knowing rather than discovering later:
 
 `makeobj` is invoked as a subprocess, not linked, so it imposes nothing.
 
-## The example assets: undecided, deliberately
+## The example assets: CC BY 4.0, with a trademark note
 
 `assets/civia_465/` and `assets/metro9k/` are 3D models of a **Renfe Civia 465**
-and a **Madrid Metro serie 9000**. They are our geometry, but they wear the
-liveries and the shapes of two real operators' trains.
+and a **Madrid Metro serie 9000**, modelled by **victor_18993**.
 
-They are therefore **not licensed yet**, and that is a decision, not an oversight.
-Putting a licence on them would be a statement about somebody else's trademarks
-and design that we are not in a position to make. Until that is settled they are
-"all rights reserved, present here as working examples".
+The **original work** — the geometry, the textures, and the `.blend` files — is
+licensed **CC BY 4.0** (Creative Commons Attribution 4.0 International,
+<https://creativecommons.org/licenses/by/4.0/>). You may use, modify and
+redistribute it, including commercially, as long as you credit the modeller. Each
+of the two folders carries its own `LICENSE.md` with the exact attribution line.
 
-`assets/_template/` is ours, invented, and carries no such baggage.
+**What the licence does not cover.** These models wear the names, liveries and
+shapes of two real operators' trains. A licence grants rights to *our* work; it
+cannot grant rights to third-party trademarks or industrial designs. "Renfe",
+"Civia", "Metro de Madrid", "serie 9000", and the operators' liveries and marks,
+belong to their respective owners and appear here only to depict the real vehicles.
+**The CC BY 4.0 grant applies solely to the original 3D modelling work; it makes no
+claim over, and grants no rights in, those trademarks or designs.** If you reuse
+the models, that third-party layer travels with them and is your responsibility.
+
+`assets/_template/` is ours, invented, and carries no such baggage; it is MIT with
+the rest of the repository.
 
 The reference photographs the models were built from are **not in this
 repository** (see `.gitignore`). They are third-party photographs; we do not own

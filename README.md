@@ -750,5 +750,8 @@ wrong one: `addon/` imports `bpy`, which makes it a derivative work of Blender
 and obliges it to be GPL-compatible. Artistic 1.0 is not. MIT is, and it is more
 permissive besides.
 
-The two example trains are modelled on real vehicles and are **not licensed
-yet** — deliberately. Both points are set out in [LICENSING.md](LICENSING.md).
+The two example trains are 3D models of real vehicles (a Renfe Civia 465 and a
+Madrid Metro serie 9000) by victor_18993. The **original modelling work** is
+**CC BY 4.0**; the licence covers our geometry and textures only, not the operators'
+trademarks or designs, which the models merely depict. Each folder has its own
+`LICENSE.md`, and both points are set out in [LICENSING.md](LICENSING.md).
