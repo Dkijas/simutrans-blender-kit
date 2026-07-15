@@ -173,6 +173,13 @@ class SimutransProps(PropertyGroup):
                         description="in 1/16 of a tile; 8 is half a tile")
     payload: IntProperty(name="Payload", translation_context=CTX, default=0, min=0)
     freight: StringProperty(name="Freight", translation_context=CTX, default="None")
+    freight_goods: StringProperty(
+        name="Cargo variants", translation_context=CTX, default="",
+        description="Comma-separated goods for a wagon that looks different loaded "
+                    "(e.g. 'Kohle, Oel'). Put each load in a collection freight_0, "
+                    "freight_1, ... in the same order. Leave EMPTY for a wagon that "
+                    "looks the same whatever it carries",
+    )
     cost: IntProperty(name="Cost (cents)", translation_context=CTX,
                       default=1000000, min=0)
     runningcost: IntProperty(name="Running cost", translation_context=CTX,
@@ -325,10 +332,29 @@ def _render(p, out):
     _build_dat, and it is exactly what Write .dat re-runs on its own.
     """
     if p.obj_type == "vehicle":
-        frames = rig.render_directions(
-            bpy, out, p.pakset, dirs=int(p.dirs), basename=p.basename,
-            align_offset=tuple(p.align_offset))
-        record = {"obj_type": "vehicle", "frames": frames}
+        goods = _names(p.freight_goods)
+        if goods:
+            # A cargo-variant wagon: one loaded sheet per good, from collections
+            # freight_0..freight_N-1. The good count and the collection count must
+            # agree - the engine needs exactly one freightimagetype per freight
+            # image (vehicle_writer.cc), so a mismatch is caught here, not shipped.
+            n_col = rig.freight_variant_count(bpy)
+            if n_col != len(goods):
+                raise ValueError(
+                    _("You listed %d cargo variant(s) but there are %d freight_ "
+                      "collection(s). Make one collection freight_0..freight_%d, "
+                      "one per good, in order") % (len(goods), n_col, len(goods) - 1))
+            empty, variants = rig.render_freight_variants(
+                bpy, out, p.pakset, dirs=int(p.dirs), basename=p.basename,
+                align_offset=tuple(p.align_offset), count=len(goods))
+            record = {"obj_type": "vehicle", "freight": True,
+                      "empty": empty, "variants": variants, "goods": goods}
+            frames = list(empty) + [f for v in variants for f in v]
+        else:
+            frames = rig.render_directions(
+                bpy, out, p.pakset, dirs=int(p.dirs), basename=p.basename,
+                align_offset=tuple(p.align_offset))
+            record = {"obj_type": "vehicle", "frames": frames}
 
     elif p.obj_type == "building":
         season_setup = rig.collection_variant_setup("season_") if p.seasons > 1 else None
@@ -398,17 +424,23 @@ def _build_dat(p, out, record):
     """
     common = dict(name=p.obj_name, author=p.author)
     kind = record["obj_type"]
-    frames = record["frames"]
+    frames = record.get("frames")
 
     if kind == "vehicle":
-        png, dat, _pl = rig.build_sheet_and_dat(
-            frames, out, p.pakset, basename=p.basename, cols=4,
+        vehicle_kwargs = dict(
             waytype=p.waytype, engine_type=p.engine_type, speed=p.speed,
             power=p.power, weight=p.weight, length=p.length, payload=p.payload,
             freight=p.freight, cost=p.cost, runningcost=p.runningcost,
             intro_year=p.intro_year,
             constraint_prev=_names(p.constraint_prev),
             constraint_next=_names(p.constraint_next), **common)
+        if record.get("freight"):
+            png, dat, _pl = rig.build_freight_sheet_and_dat(
+                record["empty"], record["variants"], record["goods"], out,
+                p.pakset, basename=p.basename, cols=4, **vehicle_kwargs)
+            return png, dat
+        png, dat, _pl = rig.build_sheet_and_dat(
+            frames, out, p.pakset, basename=p.basename, cols=4, **vehicle_kwargs)
         return png, dat
 
     if kind == "building":
@@ -530,7 +562,11 @@ class SIMUTRANS_OT_render_sheet(Operator):
         # use), goes to execute() unchanged: bpy.ops.render.render is itself
         # blocking, so a modal only buys an update-and-cancel point BETWEEN
         # headings, and only the vehicle path renders one still per heading.
-        if context.scene.simutrans.obj_type != "vehicle":
+        #
+        # A cargo-variant wagon renders several sheets (empty + one per good), which
+        # the modal does not step; it goes through execute() synchronously too.
+        p = context.scene.simutrans
+        if p.obj_type != "vehicle" or _names(p.freight_goods):
             return self.execute(context)
         return self._invoke_vehicle_modal(context)
 
@@ -940,8 +976,9 @@ class SIMUTRANS_PT_panel(Panel):
 # noise in a panel is how people stop reading panels.
 _DAT_FIELDS = {
     "vehicle": ("obj_name", "author", "waytype", "engine_type", "speed", "power",
-                "weight", "length", "freight", "payload", "cost", "runningcost",
-                "intro_year", "constraint_prev", "constraint_next"),
+                "weight", "length", "freight", "payload", "freight_goods",
+                "cost", "runningcost", "intro_year",
+                "constraint_prev", "constraint_next"),
     "building": ("obj_name", "author", "btype", "size_x", "size_y", "layouts",
                  "level", "chance", "seasons", "phases", "intro_year"),
     "way": ("obj_name", "author", "waytype", "topspeed", "cost", "maintenance",

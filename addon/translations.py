@@ -87,6 +87,10 @@ SOURCE_STRINGS = (
     "in 1/16 of a tile; 8 is half a tile",
     "Payload",
     "Freight",
+    "Cargo variants",
+    "Comma-separated goods for a wagon that looks different loaded (e.g. 'Kohle, "
+    "Oel'). Put each load in a collection freight_0, freight_1, ... in the same "
+    "order. Leave EMPTY for a wagon that looks the same whatever it carries",
     "Cost (cents)",
     "Running cost",
     "Intro year",
@@ -124,6 +128,8 @@ SOURCE_STRINGS = (
     "Save your .blend first, or set an absolute Output path ('//' means 'next to "
     "the .blend', and there isn't one yet)",
     "Nothing to render - the scene has no mesh",
+    "You listed %d cargo variant(s) but there are %d freight_ collection(s). "
+    "Make one collection freight_0..freight_%d, one per good, in order",
     "Rendered %d frames to %s",
     "Rendering %d headings - Esc to cancel",
     "Rendering heading %d/%d - Esc to cancel",
@@ -292,6 +298,14 @@ SPANISH = {
         "en 1/16 de casilla; 8 es media casilla",
     "Payload": "Capacidad",
     "Freight": "Carga",
+    "Cargo variants": "Variantes de carga",
+    "Comma-separated goods for a wagon that looks different loaded (e.g. 'Kohle, "
+    "Oel'). Put each load in a collection freight_0, freight_1, ... in the same "
+    "order. Leave EMPTY for a wagon that looks the same whatever it carries":
+        "Mercancías separadas por coma para un vagón que se ve distinto cargado "
+        "(p. ej. 'Kohle, Oel'). Pon cada carga en una colección freight_0, "
+        "freight_1, ... en el mismo orden. Déjalo VACÍO para un vagón que se ve "
+        "igual lleve lo que lleve",
     "Cost (cents)": "Precio (céntimos)",
     "Running cost": "Coste por km",
     "Intro year": "Año de aparición",
@@ -346,6 +360,10 @@ SPANISH = {
         "'junto al .blend', y todavía no hay ninguno)",
     "Nothing to render - the scene has no mesh":
         "No hay nada que renderizar: la escena no tiene ninguna malla",
+    "You listed %d cargo variant(s) but there are %d freight_ collection(s). "
+    "Make one collection freight_0..freight_%d, one per good, in order":
+        "Indicaste %d variante(s) de carga pero hay %d colección(es) freight_. "
+        "Crea una colección freight_0..freight_%d, una por mercancía, en orden",
     "Rendered %d frames to %s": "%d fotogramas renderizados en %s",
     "Rendering %d headings - Esc to cancel":
         "Renderizando %d orientaciones - Esc para cancelar",

@@ -223,6 +223,41 @@ def main():
     p.constraint_prev = ""
     p.constraint_next = ""
 
+    # --- cargo-variant wagon, driven from the panel through the freight_ collections
+    clear()
+    cube(sx=1.0, sy=0.4, sz=0.3)                       # the flatbed, always there
+    coal = new_collection("freight_0")
+    cube(z=0.55, sx=0.9, sy=0.35, sz=0.2, collection=coal)
+    oil = new_collection("freight_1")
+    cube(z=0.7, sx=0.3, sy=0.3, sz=0.6, collection=oil)
+    p.obj_name = "Panel_Hopper"
+    p.freight_goods = "Kohle, Oel"
+    check("the panel renders a cargo-variant wagon",
+          render(p, "phopper") == {"FINISHED"})
+    dat = dat_of("phopper")
+    check("...and writes the empty images", dat and "EmptyImage[s]=" in dat, dat)
+    check("...and a freight image per good",
+          dat and "FreightImage[0][s]=" in dat and "FreightImage[1][s]=" in dat, dat)
+    check("...and the freightimagetype the engine fatals without",
+          dat and "\nfreightimagetype[0]=Kohle\n" in dat
+          and "\nfreightimagetype[1]=Oel\n" in dat, dat)
+
+    # the mismatch guard: two goods, one collection -> the panel must SAY so, not
+    # ship a wagon the engine will reject. An ERROR report makes bpy.ops raise, so
+    # read REPORTS around the call (they are appended before report() raises).
+    bpy.data.collections.remove(oil)
+    from simutrans_blender_kit.addon import ui as ui_mod
+    del ui_mod.REPORTS[:]
+    try:
+        render(p, "phopper_bad")
+    except RuntimeError:
+        pass
+    reports = list(ui_mod.REPORTS)
+    check("a good with no freight_ collection is reported to the panel",
+          any(lvl == {"ERROR"} and "freight_" in msg for lvl, msg in reports),
+          str(reports))
+    p.freight_goods = ""
+
     # --- building, with a snow season and an animated phase, from collections
     clear()
     cube(sz=0.8)
