@@ -342,6 +342,55 @@ def test_image_block_and_dat():
     check("dat has power", "power=1500" in dat)
 
 
+def test_freight_variants_emit_freightimagetype():
+    """A cargo-variant vehicle needs freightimagetype[i] per freight image.
+
+    Verified against makeobj (the real oracle), which FATALs without them:
+
+        FATAL ERROR: Missing freightimagetype[0] for 3 freight_images!
+
+    (vehicle_writer.cc: it walks freightimagetype[0..N-1] and dies on a gap, and
+    each value is written as an obj_good xref, so a typo resolves to nothing at
+    game load). So the count and order here MUST track the freightimage[i] blocks.
+    """
+    tb = datgen.freightimagetype_block(["Kohle", "Oel"])
+    check("one line per good, indexed in order",
+          tb == "freightimagetype[0]=Kohle\nfreightimagetype[1]=Oel", tb)
+    check("no goods -> empty string", datgen.freightimagetype_block([]) == "")
+
+    place = {"s": (0, 0), "w": (0, 1), "sw": (0, 2), "se": (0, 3)}
+    empty = datgen.image_block("hop", place)
+    f0 = datgen.image_block("hop", {"s": (1, 0)}, freight=True, freight_index=0)
+    f1 = datgen.image_block("hop", {"s": (2, 0)}, freight=True, freight_index=1)
+    dat = datgen.vehicle_dat("Hopper", empty + "\n" + f0 + "\n" + f1,
+                             freight="Kohle", freight_types=["Kohle", "Oel"])
+    check("emits freightimagetype[0]", "\nfreightimagetype[0]=Kohle\n" in dat)
+    check("emits freightimagetype[1]", "\nfreightimagetype[1]=Oel\n" in dat)
+    n_type = dat.count("freightimagetype[")
+    n_img = dat.count("FreightImage[0][") and (
+        1 + max(int(l.split("[", 2)[1].split("]")[0])
+                for l in dat.splitlines() if l.startswith("FreightImage[")))
+    check("one freightimagetype per freight index (%d vs %d)" % (n_type, n_img),
+          n_type == n_img, dat)
+
+
+def test_a_vehicle_without_freight_is_byte_identical():
+    """Adding freight support must not shift a single byte of a plain vehicle.
+
+    The freightimagetype slot collapses to nothing when freight_types is empty, so
+    every vehicle in every existing pakset the kit might regenerate comes out
+    exactly as it did before the feature landed.
+    """
+    block = datgen.image_block("t", {"s": (0, 0), "w": (0, 1)})
+    without = datgen.vehicle_dat("Plain", block, waytype="track", power=1500)
+    explicit = datgen.vehicle_dat("Plain", block, waytype="track", power=1500,
+                                  freight_types=())
+    check("freight_types=() is the default", without == explicit)
+    check("no freightimagetype line leaks in", "freightimagetype" not in without)
+    check("no blank-line churn around payload",
+          "\npayload=0\n\n# --- coupling" in without, without)
+
+
 def test_dat_has_no_end_of_line_comments():
     """A .dat has NO trailing comments - and the engine dies if you write one.
 

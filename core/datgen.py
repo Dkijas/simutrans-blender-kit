@@ -36,6 +36,22 @@ def image_block(sheet_basename: str, placement: dict, freight: bool = False,
     return "\n".join(lines)
 
 
+def freightimagetype_block(goods) -> str:
+    """freightimagetype[i]=<good> for each good, in order. '' for no freight.
+
+    The engine demands EXACTLY one of these per freight image and no more:
+    vehicle_writer.cc:305 walks freightimagetype[0..N-1] and dies with
+        FATAL: Missing freightimagetype[i] for N freight_images!
+    if one is absent, and warns if there is a spare (index N). Each value has to
+    name a real pakset good - it is written out as an obj_good cross-reference, so
+    a typo fails to resolve at load, not at compile. Emitting them mechanically,
+    from the same list that drove the render, is the only way to keep the count
+    and the order in lockstep with the freightimage[i][dir] blocks.
+    """
+    return "\n".join("freightimagetype[%d]=%s" % (i, g)
+                     for i, g in enumerate(goods))
+
+
 # Minimal, honest skeleton. Every value here is one the engine actually reads
 # (extracted from descriptor/writer/vehicle_writer.cc), documented so nobody has
 # to guess or trawl the forum for the parameter list.
@@ -77,7 +93,7 @@ length={length}
 # freight: None|Passagiere|Post|<goods name>
 freight={freight}
 payload={payload}
-
+{freight_types}
 # --- coupling ------------------------------------------------------------
 {coupling}
 # --- graphics (generated - do not hand-edit) -----------------------------
@@ -114,13 +130,22 @@ def vehicle_dat(name, images, waytype="track", author="", freight="None",
                 payload=0, speed=100, power=0, gear=100, weight=20, length=8,
                 cost=1000000, runningcost=100, intro_year=1900, retire_year=2999,
                 engine_type="diesel", constraint_prev=(),
-                constraint_next=()) -> str:
-    """A complete, compilable vehicle .dat with the image block filled in."""
+                constraint_next=(), freight_types=()) -> str:
+    """A complete, compilable vehicle .dat with the image block filled in.
+
+    freight_types: the goods, in index order, that the freightimage[i][dir] blocks
+    in `images` were rendered for. Pass () for a vehicle with no freight images
+    (the output is then byte-for-byte what it was before this parameter existed).
+    Give it goods and it emits the matching freightimagetype[i] lines the engine
+    requires - see freightimagetype_block. The caller is responsible for putting
+    the same number of freightimage[i] blocks into `images`, in the same order.
+    """
     return _VEHICLE_SKELETON.format(
         name=name, author=author, waytype=waytype, cost=cost,
         runningcost=runningcost, intro_year=intro_year, retire_year=retire_year,
         engine_type=engine_type, speed=speed, power=power, gear=gear,
         weight=weight, length=length, freight=freight, payload=payload,
+        freight_types=freightimagetype_block(freight_types),
         coupling=_coupling_block(constraint_prev, constraint_next),
         images=images,
     )
