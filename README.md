@@ -721,9 +721,6 @@ Buildings, freight (cargo) variants, ways, catenary, signals, tunnels, bridges,
 stations/depots and factories have all landed since this section first listed them
 as pending. What is still open:
 
-* **Vehicles that occupy more than one tile.** A single vehicle longer than one
-  tile is not supported. Convoys of several one-tile cars *are* — the two example
-  units are built that way.
 * **Livery variants** are a Simutrans *Extended* feature, not base Simutrans, so
   they are out of scope here; freight (cargo) variants are the base-game equivalent
   and are implemented.
@@ -731,6 +728,18 @@ as pending. What is still open:
   mounted here to measure. The `profile` test will measure them the day they are.
 * **Per-slope orientation** of tunnels and bridges is derived, not yet eye-checked
   in a windowed game (see above).
+
+**Not a gap — a property of the engine: long vehicles are convoys, not big
+sprites.** A single vehicle draws **one image per heading** (`vehicle.cc`
+`get_image_id(dir, freight)`), and that image is capped at **one `img_size` cell**
+— `image_writer.cc` reads every `image=file.row.col` as exactly one
+`img_size × img_size` square (`row *= img_size; col *= img_size`), 128×128 for
+pak128. There is no way for one sprite to span more tiles. A vehicle physically
+longer than a tile is therefore built the way the engine intends: as a **convoy of
+coupled one-tile cars**, each its own `.pak`, each with its own `length`. The kit
+already does this — the two example units (a five-car Civia and a six-car Metro)
+are assembled and run that way. The `length` field (in `1/16` of a tile) sets a
+vehicle's spacing and coupling, not its image size.
 
 ## License
 
