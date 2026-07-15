@@ -801,6 +801,31 @@ def test_linter_validates_integer_values():
                   for f in schema.lint("obj=vehicle\nname=abc123\nimage[1]=x.0.0\n")))
 
 
+def test_grid_placement_is_pure():
+    """The sheet placement depends only on key order and column count.
+
+    It reads no pixels - which is what makes it possible one day to rewrite a .dat
+    without re-rendering, since the .dat only ever names a cell by (row, col).
+    """
+    from core import sheet
+
+    keys = ["a", "b", "c", "d", "e"]
+    p = sheet.grid_placement(keys, cols=2)
+    check("row-major, wraps at cols",
+          p == {"a": (0, 0), "b": (0, 1), "c": (1, 0), "d": (1, 1), "e": (2, 0)},
+          str(p))
+
+    # tuple keys (buildings, wayobj) survive unchanged
+    tkeys = [(0, 0), (0, 1), (1, 0)]
+    check("tuple keys are kept as-is",
+          sheet.grid_placement(tkeys, cols=2) == {(0, 0): (0, 0), (0, 1): (0, 1),
+                                                  (1, 0): (1, 0)})
+
+    # and it is exactly what assemble() puts out, so the two never drift
+    check("cols defaults to one row", sheet.grid_placement(keys) ==
+          {k: (0, i) for i, k in enumerate(keys)})
+
+
 def test_findings_carry_codes_and_can_be_suppressed():
     """Every finding has a stable code, and a file can silence one by that code."""
     from core import schema

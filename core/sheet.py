@@ -178,6 +178,19 @@ def write_png(path, width, height, pixels, has_alpha=True):
         f.write(chunk(b"IEND", b""))
 
 
+def grid_placement(keys, cols=None):
+    """Where each key lands on the sheet -> {key: (row, col)}.
+
+    A PURE function of the key ORDER and the column count. It reads no pixels,
+    because the .dat only ever refers to a cell by row and column - which is what
+    makes it possible to rewrite a .dat WITHOUT re-rendering. assemble() uses this
+    for the placement and only touches the images to paint the sheet.
+    """
+    if cols is None:
+        cols = len(keys) or 1
+    return {key: divmod(idx, cols) for idx, key in enumerate(keys)}
+
+
 def assemble(frames, tile_px, cols=None, out_path=None):
     """Lay rendered frames onto a tile grid.
 
@@ -187,15 +200,16 @@ def assemble(frames, tile_px, cols=None, out_path=None):
     """
     n = len(frames)
     if cols is None:
-        cols = n
+        cols = n or 1
     rows = (n + cols - 1) // cols
+
+    placement = grid_placement([key for key, _ in frames], cols)
 
     sheet_w, sheet_h = cols * tile_px, rows * tile_px
     canvas = [(0, 0, 0, 0)] * (sheet_w * sheet_h)
-    placement = {}
 
-    for idx, (key, path) in enumerate(frames):
-        r, c = divmod(idx, cols)
+    for key, path in frames:
+        r, c = placement[key]
         w, h, _alpha, px = read_png(path)
         if (w, h) != (tile_px, tile_px):
             raise ValueError("%s is %dx%d, expected %dx%d - wrong ortho_scale or "
@@ -205,7 +219,6 @@ def assemble(frames, tile_px, cols=None, out_path=None):
             for x in range(w):
                 p = px[y * w + x]
                 canvas[base + x] = p if len(p) == 4 else (p[0], p[1], p[2], 255)
-        placement[key] = (r, c)
 
     if out_path:
         write_png(out_path, sheet_w, sheet_h, canvas, has_alpha=True)

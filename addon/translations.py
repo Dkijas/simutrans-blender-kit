@@ -132,6 +132,13 @@ SOURCE_STRINGS = (
     ".dat: %d error(s), %d warning(s)",
     ".dat line %d: %s",
     "%s + %s, with %d warning(s) above",
+    # Write .dat: rebuild the .dat from the last render, no re-rendering
+    "Rewrite the .dat from the last render, with the current numbers - no "
+    "re-rendering. Change power, cost, couplings and press this instead of "
+    "rendering every heading again",
+    "No render to build from - press Render Sheet first",
+    "The last render of %r was a %s, not a %s",
+    "Wrote %s (no re-render)",
     # --- materials: the reserved colours the kit exists to make reachable
     "Materials",
     "Material",
@@ -343,6 +350,17 @@ SPANISH = {
     ".dat: %d error(s), %d warning(s)": ".dat: %d error(es), %d aviso(s)",
     ".dat line %d: %s": ".dat línea %d: %s",
     "%s + %s, with %d warning(s) above": "%s + %s, con %d aviso(s) arriba",
+    "Rewrite the .dat from the last render, with the current numbers - no "
+    "re-rendering. Change power, cost, couplings and press this instead of "
+    "rendering every heading again":
+        "Reescribe el .dat desde el último render, con los números actuales, sin "
+        "volver a renderizar. Cambia potencia, coste o enganches y pulsa esto en "
+        "vez de renderizar otra vez cada dirección",
+    "No render to build from - press Render Sheet first":
+        "No hay render del que partir: pulsa antes Renderizar hoja",
+    "The last render of %r was a %s, not a %s":
+        "El último render de %r fue un %s, no un %s",
+    "Wrote %s (no re-render)": "Escrito %s (sin re-renderizar)",
 
     # --- materials
     "Materials": "Materiales",

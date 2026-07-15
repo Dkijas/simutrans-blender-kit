@@ -304,34 +304,29 @@ def _names(text):
     return tuple(n.strip() for n in text.split(",") if n.strip())
 
 
+# The last render, per (output dir, basename), kept so the .dat can be rewritten
+# WITHOUT rendering again. The expensive step is the Blender render; the per-frame
+# PNGs it produced still sit on disk, so rebuilding the sheet and the .dat from the
+# same frame list is a matter of milliseconds. An artist can change power= or cost=
+# and press Write .dat instead of re-rendering 320 headings. In memory, so it lasts
+# a Blender session - which is exactly the edit-the-numbers loop it is for.
+_LAST_RENDER = {}
+
+
 def _render(p, out):
-    """Render whatever kind of object is selected. -> (frames, sheet_png, dat_path).
+    """Render the selected object and build its .dat. -> (frames, sheet, dat).
 
-    Every branch ends the same way: a sheet, and a .dat keyed the way the engine
-    indexes that kind of object. The differences between them are not cosmetic -
-    a vehicle is one sprite per heading, a building is a grid, a way is indexed by
-    which neighbours it touches - so this is where they part company, and nowhere
-    else.
+    Two steps kept apart on purpose: rendering the headings (slow, Blender), then
+    building the sheet and .dat from them (fast, no Blender). The second step is
+    _build_dat, and it is exactly what Write .dat re-runs on its own.
     """
-    common = dict(name=p.obj_name, author=p.author)
-
     if p.obj_type == "vehicle":
         frames = rig.render_directions(
             bpy, out, p.pakset, dirs=int(p.dirs), basename=p.basename,
             align_offset=tuple(p.align_offset))
-        if not p.write_dat:
-            return frames, None, None
-        png, dat, _pl = rig.build_sheet_and_dat(
-            frames, out, p.pakset, basename=p.basename, cols=4,
-            waytype=p.waytype, engine_type=p.engine_type, speed=p.speed,
-            power=p.power, weight=p.weight, length=p.length, payload=p.payload,
-            freight=p.freight, cost=p.cost, runningcost=p.runningcost,
-            intro_year=p.intro_year,
-            constraint_prev=_names(p.constraint_prev),
-            constraint_next=_names(p.constraint_next), **common)
-        return frames, png, dat
+        record = {"obj_type": "vehicle", "frames": frames}
 
-    if p.obj_type == "building":
+    elif p.obj_type == "building":
         season_setup = rig.collection_variant_setup("season_") if p.seasons > 1 else None
         phase_setup = rig.collection_variant_setup("phase_") if p.phases > 1 else None
         frames = rig.render_building(
@@ -340,9 +335,79 @@ def _render(p, out):
             layouts=(p.layouts or None), seasons=p.seasons,
             season_setup=season_setup, phases=p.phases, phase_setup=phase_setup,
             align_offset=tuple(p.align_offset))
-        if not p.write_dat:
-            return frames, None, None
+        record = {"obj_type": "building", "frames": frames}
 
+    elif p.obj_type == "way":
+        frames = rig.render_way(bpy, out, p.pakset, basename=p.basename,
+                                align_offset=tuple(p.align_offset))
+        # The ramp, if the artist modelled one (collection way_slope, and way_slope2
+        # for a double-height ramp). Without it the way is INVISIBLE on every slope
+        # in the game - weg.cc:545 has no fallback, unlike the diagonals.
+        slope_frames = slope2_frames = ()
+        if rig.has_slope_model(bpy):
+            slope_frames = rig.render_way_slopes(
+                bpy, out, p.pakset, basename=p.basename,
+                align_offset=tuple(p.align_offset))
+        if rig.has_slope_model(bpy, double=True):
+            slope2_frames = rig.render_way_slopes(
+                bpy, out, p.pakset, basename=p.basename, double=True,
+                align_offset=tuple(p.align_offset))
+        record = {"obj_type": "way", "frames": frames,
+                  "slope_frames": slope_frames, "slope2_frames": slope2_frames}
+
+    elif p.obj_type == "wayobj":
+        frames = rig.render_wayobj(bpy, out, p.pakset, basename=p.basename,
+                                   align_offset=tuple(p.align_offset))
+        # The ramp (collection wayobj_slope). Without it the catenary is not drawn
+        # on a slope at all - wayobj.cc:270, no guard.
+        slope_frames = ()
+        if rig.has_wayobj_slope_model(bpy):
+            slope_frames = rig.render_wayobj_slopes(
+                bpy, out, p.pakset, basename=p.basename,
+                align_offset=tuple(p.align_offset))
+        record = {"obj_type": "wayobj", "frames": frames,
+                  "slope_frames": slope_frames}
+
+    elif p.obj_type == "roadsign":
+        state_setup = rig.collection_variant_setup("state_") if p.states > 1 else None
+        frames = rig.render_roadsign(
+            bpy, out, p.pakset, basename=p.basename, states=p.states,
+            state_setup=state_setup, align_offset=tuple(p.align_offset))
+        record = {"obj_type": "roadsign", "frames": frames}
+
+    else:
+        raise ValueError("unknown object type %r" % (p.obj_type,))
+
+    _LAST_RENDER[(out, p.basename)] = record
+    if not p.write_dat:
+        return frames, None, None
+    png, dat = _build_dat(p, out, record)
+    return frames, png, dat
+
+
+def _build_dat(p, out, record):
+    """Sheet + .dat from an already-rendered frame list. No Blender. -> (png, dat).
+
+    Reads the frames from `record` and every other value from the panel, so it is
+    the one place a .dat is written - whether straight after a render or, later,
+    from Write .dat with the numbers changed and not a pixel re-rendered.
+    """
+    common = dict(name=p.obj_name, author=p.author)
+    kind = record["obj_type"]
+    frames = record["frames"]
+
+    if kind == "vehicle":
+        png, dat, _pl = rig.build_sheet_and_dat(
+            frames, out, p.pakset, basename=p.basename, cols=4,
+            waytype=p.waytype, engine_type=p.engine_type, speed=p.speed,
+            power=p.power, weight=p.weight, length=p.length, payload=p.payload,
+            freight=p.freight, cost=p.cost, runningcost=p.runningcost,
+            intro_year=p.intro_year,
+            constraint_prev=_names(p.constraint_prev),
+            constraint_next=_names(p.constraint_next), **common)
+        return png, dat
+
+    if kind == "building":
         pak = paksets.get(p.pakset)
         png = os.path.join(out, "%s.png" % p.basename)
         placement = sheet.assemble(frames, pak.tile_px, cols=4, out_path=png)
@@ -357,73 +422,34 @@ def _render(p, out):
         dat = os.path.join(out, "%s.dat" % p.basename)
         with open(dat, "w", encoding="utf-8") as f:
             f.write(text)
-        return frames, png, dat
+        return png, dat
 
-    if p.obj_type == "way":
-        frames = rig.render_way(bpy, out, p.pakset, basename=p.basename,
-                                align_offset=tuple(p.align_offset))
-
-        # The ramp, if the artist modelled one (collection way_slope, and way_slope2
-        # for a double-height ramp). Without it the way is INVISIBLE on every slope
-        # in the game - weg.cc:545 has no fallback, unlike the diagonals - so this
-        # is not an optional flourish. The linter is what tells the artist it is
-        # missing; nothing here can, until the panel can carry a warning.
-        slope_frames = slope2_frames = ()
-        if rig.has_slope_model(bpy):
-            slope_frames = rig.render_way_slopes(
-                bpy, out, p.pakset, basename=p.basename,
-                align_offset=tuple(p.align_offset))
-        if rig.has_slope_model(bpy, double=True):
-            slope2_frames = rig.render_way_slopes(
-                bpy, out, p.pakset, basename=p.basename, double=True,
-                align_offset=tuple(p.align_offset))
-
-        if not p.write_dat:
-            return frames, None, None
+    if kind == "way":
         png, dat, _pl = rig.build_way_sheet_and_dat(
             frames, out, p.pakset, basename=p.basename, cols=4,
-            slope_frames=slope_frames, slope2_frames=slope2_frames,
+            slope_frames=record.get("slope_frames", ()),
+            slope2_frames=record.get("slope2_frames", ()),
             waytype=p.waytype, topspeed=p.topspeed, cost=p.cost,
             maintenance=p.maintenance, intro_year=p.intro_year, **common)
-        return frames, png, dat
+        return png, dat
 
-    if p.obj_type == "wayobj":
-        frames = rig.render_wayobj(bpy, out, p.pakset, basename=p.basename,
-                                   align_offset=tuple(p.align_offset))
-
-        # The ramp (collection wayobj_slope). Without it the catenary is not drawn
-        # on a slope at all - wayobj.cc:270, no guard - so the rail climbs the hill
-        # and the wire does not, while the tile stays electrified.
-        slope_frames = ()
-        if rig.has_wayobj_slope_model(bpy):
-            slope_frames = rig.render_wayobj_slopes(
-                bpy, out, p.pakset, basename=p.basename,
-                align_offset=tuple(p.align_offset))
-
-        if not p.write_dat:
-            return frames, None, None
+    if kind == "wayobj":
         png, dat, _pl = rig.build_wayobj_sheet_and_dat(
             frames, out, p.pakset, basename=p.basename, cols=8,
-            slope_frames=slope_frames,
+            slope_frames=record.get("slope_frames", ()),
             waytype=p.waytype, own_waytype=p.own_waytype, cost=p.cost,
             maintenance=p.maintenance, topspeed=p.topspeed,
             intro_year=p.intro_year, **common)
-        return frames, png, dat
+        return png, dat
 
-    if p.obj_type == "roadsign":
-        state_setup = rig.collection_variant_setup("state_") if p.states > 1 else None
-        frames = rig.render_roadsign(
-            bpy, out, p.pakset, basename=p.basename, states=p.states,
-            state_setup=state_setup, align_offset=tuple(p.align_offset))
-        if not p.write_dat:
-            return frames, None, None
+    if kind == "roadsign":
         png, dat, _pl = rig.build_roadsign_sheet_and_dat(
             frames, out, p.pakset, basename=p.basename, cols=4,
             waytype=p.waytype, is_signal=int(p.is_signal), cost=p.cost,
             intro_year=p.intro_year, **common)
-        return frames, png, dat
+        return png, dat
 
-    raise ValueError("unknown object type %r" % (p.obj_type,))
+    raise ValueError("unknown object type %r" % (kind,))
 
 
 class SIMUTRANS_OT_build_rig(Operator):
@@ -498,22 +524,7 @@ class SIMUTRANS_OT_render_sheet(Operator):
             say(self, {"INFO"}, _("Rendered %d frames to %s") % (len(frames), out))
             return {"FINISHED"}
 
-        # Check what we just wrote against what the engine actually reads. The
-        # artist gets this without having to know the linter exists - which is
-        # the point, because the two worst .dat mistakes are silent.
-        with open(dat_path, encoding="utf-8") as f:
-            findings = schema.lint(f.read())
-        for finding in findings:
-            print("%s:%d: %s: %s" % (dat_path, finding.line, finding.level,
-                                     finding.message))
-        errors = sum(1 for f in findings if f.level == "error")
-        for finding in findings:
-            say(self, {"ERROR"} if finding.level == "error" else {"WARNING"},
-                        _(".dat line %d: %s") % (finding.line, finding.message))
-        if findings:
-            say(self, {"WARNING"},
-                        _(".dat: %d error(s), %d warning(s)")
-                        % (errors, len(findings) - errors))
+        if _report_lint(self, dat_path):
             return {"FINISHED"}
 
         if raised:
@@ -524,6 +535,60 @@ class SIMUTRANS_OT_render_sheet(Operator):
 
         say(self, {"INFO"}, "%s + %s"
                     % (os.path.basename(sheet_png), os.path.basename(dat_path)))
+        return {"FINISHED"}
+
+
+def _report_lint(operator, dat_path):
+    """Lint the .dat and report every finding into the panel. -> did it find any?
+
+    The artist gets this without knowing the linter exists, which is the point:
+    the two worst .dat mistakes are silent.
+    """
+    with open(dat_path, encoding="utf-8") as f:
+        findings = schema.lint(f.read())
+    for finding in findings:
+        print("%s:%d: %s: %s" % (dat_path, finding.line, finding.level,
+                                 finding.message))
+        say(operator, {"ERROR"} if finding.level == "error" else {"WARNING"},
+            _(".dat line %d: %s") % (finding.line, finding.message))
+    if findings:
+        errors = sum(1 for f in findings if f.level == "error")
+        say(operator, {"WARNING"}, _(".dat: %d error(s), %d warning(s)")
+            % (errors, len(findings) - errors))
+    return bool(findings)
+
+
+class SIMUTRANS_OT_write_dat(Operator):
+    bl_idname = "simutrans.write_dat"
+    bl_label = "Write .dat"
+    bl_translation_context = CTX
+    bl_description = ("Rewrite the .dat from the last render, with the current "
+                      "numbers - no re-rendering. Change power, cost, couplings and "
+                      "press this instead of rendering every heading again")
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        out, why = _out_dir(p)
+        if out is None:
+            say(self, {"ERROR"}, why)
+            return {"CANCELLED"}
+
+        record = _LAST_RENDER.get((out, p.basename))
+        if record is None:
+            say(self, {"ERROR"},
+                _("No render to build from - press Render Sheet first"))
+            return {"CANCELLED"}
+        if record["obj_type"] != p.obj_type:
+            say(self, {"ERROR"},
+                _("The last render of %r was a %s, not a %s")
+                % (p.basename, record["obj_type"], p.obj_type))
+            return {"CANCELLED"}
+
+        _png, dat_path = _build_dat(p, out, record)
+        if _report_lint(self, dat_path):
+            return {"FINISHED"}
+        say(self, {"INFO"}, _("Wrote %s (no re-render)")
+            % os.path.basename(dat_path))
         return {"FINISHED"}
 
 
@@ -763,6 +828,7 @@ class SIMUTRANS_PT_panel(Panel):
         acts = box.column()
         acts.enabled = out is not None
         acts.operator("simutrans.render_sheet", icon="RENDER_ANIMATION")
+        acts.operator("simutrans.write_dat", icon="FILE_TEXT")
         acts.operator("simutrans.check_colors", icon="COLOR")
         acts.prop(p, "night_level")
         acts.operator("simutrans.night_preview", icon="LIGHT_SUN")
@@ -827,9 +893,9 @@ class SIMUTRANS_PT_dat(Panel):
 
 
 CLASSES = (SimutransProps, SIMUTRANS_OT_build_rig, SIMUTRANS_OT_render_sheet,
-           SIMUTRANS_OT_check_colors, SIMUTRANS_OT_night_preview,
-           SIMUTRANS_OT_apply_material, SIMUTRANS_OT_compile_pak,
-           SIMUTRANS_PT_panel, SIMUTRANS_PT_dat)
+           SIMUTRANS_OT_write_dat, SIMUTRANS_OT_check_colors,
+           SIMUTRANS_OT_night_preview, SIMUTRANS_OT_apply_material,
+           SIMUTRANS_OT_compile_pak, SIMUTRANS_PT_panel, SIMUTRANS_PT_dat)
 
 
 _TRANSLATION_DOMAIN = "simutrans_blender_kit"

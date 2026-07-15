@@ -121,6 +121,17 @@ def press_material_and_catch(props):
     return result, list(ui_mod.REPORTS)
 
 
+def press_write_dat_and_catch():
+    """Press Write .dat and read back what it reported."""
+    from simutrans_blender_kit.addon import ui as ui_mod
+    del ui_mod.REPORTS[:]
+    try:
+        result = bpy.ops.simutrans.write_dat()
+    except RuntimeError:
+        result = {"CANCELLED"}
+    return result, list(ui_mod.REPORTS)
+
+
 def dat_of(basename):
     path = os.path.join(OUT, "%s.dat" % basename)
     if not os.path.exists(path):
@@ -388,6 +399,45 @@ def main():
     p.material = "player"
     _r, reported = press_material_and_catch(p)
     check("with nothing selected, the button says so",
+          any("ERROR" in level for level, _m in reported), str(reported))
+
+    # --- WRITE .DAT WITHOUT RE-RENDERING
+    #
+    # Change a number, rewrite the .dat, and it must be byte-for-byte what a full
+    # render would have produced - because the expensive step (the render) is skipped
+    # and only the .dat is rebuilt from the frames already on disk.
+    clear()
+    p.obj_type = "vehicle"
+    p.dirs = "4"
+    p.basename = "prewrite"
+    p.power = 1000
+    cube(sx=0.4, sy=0.4, sz=0.3)
+    render(p, "prewrite")
+    after_render = dat_of("prewrite")
+    check("a render produced a .dat", after_render is not None)
+    check("the rendered .dat has the rendered power",
+          after_render and "power=1000" in after_render, "no power=1000")
+
+    # write .dat only, nothing changed: identical file, no render
+    result = bpy.ops.simutrans.write_dat()
+    check("Write .dat runs after a render", result == {"FINISHED"}, str(result))
+    after_write = dat_of("prewrite")
+    check("Write .dat with nothing changed reproduces the .dat exactly",
+          after_write == after_render, "differs")
+
+    # now CHANGE a number and write .dat only - the new number, same image refs
+    p.power = 2500
+    bpy.ops.simutrans.write_dat()
+    changed = dat_of("prewrite")
+    check("Write .dat picks up the new power", "power=2500" in changed, "no 2500")
+    check("...and the image references are unchanged",
+          [l for l in changed.splitlines() if l.startswith("image")]
+          == [l for l in after_render.splitlines() if l.startswith("image")])
+
+    # and it refuses when there was no render for this basename
+    p.basename = "never_rendered"
+    _r, reported = press_write_dat_and_catch()
+    check("Write .dat with no prior render says so",
           any("ERROR" in level for level, _m in reported), str(reported))
 
     print("\nout: %s" % OUT)
