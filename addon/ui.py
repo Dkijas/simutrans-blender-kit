@@ -411,6 +411,22 @@ class SIMUTRANS_OT_build_rig(Operator):
         return {"FINISHED"}
 
 
+# What the operators have told the user. Blender's report() vanishes into the C
+# layer and cannot be intercepted from Python, so without this there is no way to
+# prove that a warning reached the PANEL rather than the console - and "it printed
+# to the console" is precisely the bug being fixed. Kept short; it is a record of
+# the last operator run, not a log.
+REPORTS = []
+_REPORT_LIMIT = 64
+
+
+def say(operator, level, message):
+    """Tell the user, and remember that we did."""
+    del REPORTS[:-_REPORT_LIMIT + 1]
+    REPORTS.append((set(level), message))
+    operator.report(level, message)
+
+
 class SIMUTRANS_OT_render_sheet(Operator):
     bl_idname = "simutrans.render_sheet"
     bl_label = "Render Sheet"
@@ -421,24 +437,34 @@ class SIMUTRANS_OT_render_sheet(Operator):
         p = context.scene.simutrans
         out, why = _out_dir(p)
         if out is None:
-            self.report({"ERROR"}, why)
+            say(self, {"ERROR"}, why)
             return {"CANCELLED"}
 
         mins, maxs = rig.scene_bounds(bpy)
         if maxs[2] <= mins[2]:
-            self.report({"ERROR"}, _("Nothing to render - the scene has no mesh"))
+            say(self, {"ERROR"}, _("Nothing to render - the scene has no mesh"))
             return {"CANCELLED"}
 
+        # Everything the rig complains about while it renders - the model running
+        # off the edge of the cell, a stray pixel landing on a reserved colour -
+        # used to go to the console and nowhere else. The panel said "Rendered" and
+        # the artist, who does not have a console open, shipped a sprite with the
+        # cab cut off. Whatever it says now, it says HERE.
+        mark = rig.warning_mark()
         try:
             frames, sheet_png, dat_path = _render(p, out)
         except ValueError as e:
             # the rig refuses things that would compile and then be wrong - a
             # season with nothing in it, a way with no pieces modelled
-            self.report({"ERROR"}, str(e))
+            say(self, {"ERROR"}, str(e))
             return {"CANCELLED"}
 
+        raised = rig.warnings_since(mark)
+        for message in raised:
+            say(self, {"WARNING"}, message)
+
         if dat_path is None:
-            self.report({"INFO"}, _("Rendered %d frames to %s") % (len(frames), out))
+            say(self, {"INFO"}, _("Rendered %d frames to %s") % (len(frames), out))
             return {"FINISHED"}
 
         # Check what we just wrote against what the engine actually reads. The
@@ -450,13 +476,22 @@ class SIMUTRANS_OT_render_sheet(Operator):
             print("%s:%d: %s: %s" % (dat_path, finding.line, finding.level,
                                      finding.message))
         errors = sum(1 for f in findings if f.level == "error")
+        for finding in findings:
+            say(self, {"ERROR"} if finding.level == "error" else {"WARNING"},
+                        _(".dat line %d: %s") % (finding.line, finding.message))
         if findings:
-            self.report({"WARNING"},
-                        _(".dat: %d error(s), %d warning(s) - see the console")
+            say(self, {"WARNING"},
+                        _(".dat: %d error(s), %d warning(s)")
                         % (errors, len(findings) - errors))
             return {"FINISHED"}
 
-        self.report({"INFO"}, "%s + %s"
+        if raised:
+            say(self, {"WARNING"}, _("%s + %s, with %d warning(s) above")
+                        % (os.path.basename(sheet_png),
+                           os.path.basename(dat_path), len(raised)))
+            return {"FINISHED"}
+
+        say(self, {"INFO"}, "%s + %s"
                     % (os.path.basename(sheet_png), os.path.basename(dat_path)))
         return {"FINISHED"}
 

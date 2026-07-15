@@ -34,11 +34,21 @@ def check(name, cond, detail=""):
 
 
 def install_the_addon():
-    """Install and enable it exactly as the tutorial tells people to."""
+    """Build the zip from source, then install and enable it as a person would.
+
+    It used to install whatever zip was already sitting in build/. This suite only
+    passed against current code because the `addon` suite happens to run before it
+    and happens to rebuild the zip; run this file on its own and it tested whatever
+    was last built - which it duly did, reporting the OLD warning text for a change
+    that was already in the tree.
+    """
+    import subprocess
+    subprocess.run([sys.executable,
+                    os.path.join(_ROOT, "tools", "build_addon_zip.py")], check=True)
+
     zip_path = os.path.join(_ROOT, "build", "simutrans_blender_kit.zip")
     if not os.path.exists(zip_path):
-        raise SystemExit("no add-on zip at %s - run tools/build_addon_zip.py"
-                         % zip_path)
+        raise SystemExit("tools/build_addon_zip.py produced no %s" % zip_path)
     bpy.ops.preferences.addon_install(filepath=zip_path, overwrite=True)
     bpy.ops.preferences.addon_enable(module="simutrans_blender_kit")
 
@@ -78,6 +88,22 @@ def render(props, basename):
     props.out_dir = OUT
     bpy.ops.simutrans.build_rig()
     return bpy.ops.simutrans.render_sheet()
+
+
+def press_and_catch(props, basename):
+    """Press Render Sheet and read back what it REPORTED to the user.
+
+    Not what it printed. Blender's console is not the artist's screen, and the whole
+    question is whether the warning reached the PANEL. report() disappears into
+    Blender's C layer and cannot be intercepted from Python - shadowing it on the
+    operator class does nothing, because bpy_struct resolves the name itself - so
+    the operator keeps its own record and this reads that.
+    """
+    from simutrans_blender_kit.addon import ui as ui_mod
+
+    del ui_mod.REPORTS[:]
+    result = render(props, basename)
+    return result, list(ui_mod.REPORTS)
 
 
 def dat_of(basename):
@@ -274,6 +300,31 @@ def main():
         text = dat_of(basename)
         findings = schema.lint(text) if text else [1]
         check("%s.dat lints clean" % basename, not findings, str(findings))
+
+    # --- DOES THE ARTIST EVER SEE THE WARNING?
+    #
+    # The rig has always known when a model runs off the edge of its cell. It said
+    # so to the CONSOLE, which is not open on an artist's screen, and the panel
+    # said "Rendered". So the sprite shipped with the cab cut off, and the tool had
+    # told nobody. This checks what the operator REPORTS, not what it prints.
+    clear()
+    p.obj_type = "vehicle"
+    p.dirs = "4"
+    cube(sx=3.0, sy=3.0, sz=3.0)          # far too big for a 64px tile
+    result, reported = press_and_catch(p, "pclip")
+
+    check("an oversized model still renders", result == {"FINISHED"}, str(result))
+    check("...and the PANEL says it does not fit, not just the console",
+          any("WARNING" in level and "does not fit" in message
+              for level, message in reported),
+          "the operator reported: %r" % (reported,))
+
+    # and the opposite: a model that fits must not cry wolf
+    clear()
+    cube(sx=0.4, sy=0.4, sz=0.3)
+    _result, quiet = press_and_catch(p, "pfits")
+    check("a model that fits raises no clipping warning",
+          not any("does not fit" in m for _l, m in quiet), str(quiet))
 
     print("\nout: %s" % OUT)
     if FAILED:

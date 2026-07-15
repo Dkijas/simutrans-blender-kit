@@ -127,7 +127,11 @@ SOURCE_STRINGS = (
     "Rendered %d frames to %s",
     "No sheet yet - render one first",
     "No reserved colours - nothing will be recoloured",
-    ".dat: %d error(s), %d warning(s) - see the console",
+    # This used to end with "- see the console", and that WAS the bug: the artist
+    # has no console open. Every finding is reported into the panel itself now.
+    ".dat: %d error(s), %d warning(s)",
+    ".dat line %d: %s",
+    "%s + %s, with %d warning(s) above",
     # --- what kind of object
     "Object",
     "Vehicle",
@@ -316,8 +320,9 @@ SPANISH = {
     "No sheet yet - render one first": "Todavía no hay hoja: renderiza una primero",
     "No reserved colours - nothing will be recoloured":
         "Sin colores reservados: no se repintará nada",
-    ".dat: %d error(s), %d warning(s) - see the console":
-        ".dat: %d error(es), %d aviso(s) - mira la consola",
+    ".dat: %d error(s), %d warning(s)": ".dat: %d error(es), %d aviso(s)",
+    ".dat line %d: %s": ".dat línea %d: %s",
+    "%s + %s, with %d warning(s) above": "%s + %s, con %d aviso(s) arriba",
 
     # --- what kind of object, and everything that hangs off it
     "Object": "Objeto",

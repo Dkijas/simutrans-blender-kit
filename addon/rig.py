@@ -133,6 +133,37 @@ GROUND_WATCH = ("top",)
 ALL_EDGES = ("top", "bottom", "left", "right")
 
 
+# --- warnings the artist has to SEE ------------------------------------------
+#
+# Every one of these used to be print() and nothing else. Blender's console is not
+# open on an artist's screen; the panel said "Rendered" while the console said the
+# cab had been cut off, and the sprite shipped with the cab cut off. The console
+# output stays - scripts and the test suite read it - but a one-line summary is
+# also kept here, so the operator that pressed the button can put it in front of
+# the person who pressed it.
+_WARNINGS = []
+
+
+def warning_mark():
+    """Where the warning list stands now. Pass it to warnings_since()."""
+    return len(_WARNINGS)
+
+
+def warnings_since(mark=0):
+    """The one-line summaries raised since `mark`."""
+    return list(_WARNINGS[mark:])
+
+
+def _warn(summary, *detail):
+    """One line for the UI, the whole story for the console."""
+    _WARNINGS.append(summary)
+    print("\n*** %s ***" % summary.upper())
+    for line in detail:
+        print("    %s" % line)
+    print("")
+    return summary
+
+
 def warn_if_clipped(frames, what="model", watch=ALL_EDGES):
     """Say so, loudly, if the renders are running off the edge of the cell."""
     bad = {}
@@ -142,13 +173,12 @@ def warn_if_clipped(frames, what="model", watch=ALL_EDGES):
             bad[key] = edges
     if bad:
         first = sorted(bad)[0]
-        print("\n*** THE %s DOES NOT FIT THE TILE ***" % what.upper())
-        print("    %d of %d images touch the edge of their cell, so they are being"
-              % (len(bad), len(frames)))
-        print("    CUT OFF. The .pak will compile and the game will run; your object")
-        print("    will simply be missing the parts that fell outside.")
-        print("    e.g. %s runs off the %s." % (first, "/".join(bad[first])))
-        print("    Make the model smaller, or use a pakset with a bigger tile.\n")
+        _warn("the %s does not fit the tile: %d of %d images are CUT OFF (e.g. %s "
+              "runs off the %s)"
+              % (what, len(bad), len(frames), first, "/".join(bad[first])),
+              "The .pak will compile and the game will run; your object will simply",
+              "be missing the parts that fell outside the cell.",
+              "Make the model smaller, or use a pakset with a bigger tile.")
     return bad
 
 
@@ -640,11 +670,12 @@ def warn_if_reserved_colors(bpy, png_path, what="sheet"):
     hits = scan_reserved_colors(bpy, png_path)
     if not hits:
         return hits
-    print("\n*** %s HITS A RESERVED COLOUR BY ACCIDENT ***" % what.upper())
-    for line in colors.report(hits):
-        print("    %s" % line)
-    print("    The engine matches these EXACTLY and will repaint them at runtime.")
-    print("    If you meant it, say so with rig.declare_special(rgb).")
+    worst = max(hits, key=hits.get)
+    _warn("the %s hits %d reserved colour(s) by accident, e.g. #%02X%02X%02X on "
+          "%d pixels" % ((what, len(hits)) + worst + (hits[worst],)),
+          *(list(colors.report(hits))
+            + ["The engine matches these EXACTLY and will repaint them at runtime.",
+               "If you meant it, say so with rig.declare_special(rgb)."]))
     return hits
 
 
