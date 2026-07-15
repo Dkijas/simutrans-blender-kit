@@ -279,11 +279,29 @@ def image_block(basename, placement, kind=BACK):
 
 
 # See core/datgen.py for why no comment ever shares a line with a value.
+def station_block(waytype, enables):
+    """waytype= and enables_* lines for a stop / depot / extension. '' otherwise.
+
+    A stop or depot is an obj=building with type=stop|depot|extension, and the
+    engine reads its waytype from the .dat (building_writer.cc:166/178) - a stop
+    with no waytype fits nowhere. enables (any of "pax", "post", "ware") becomes
+    enables_pax=1 etc.; a passenger stop that enables nothing accepts nobody,
+    which the .pak compiles and the game runs without a word (building_writer.cc
+    only sets the bit when the key is present).
+    """
+    lines = []
+    if waytype:
+        lines.append("waytype=%s" % waytype)
+    for e in enables:
+        lines.append("enables_%s=1" % e)
+    return "\n".join(lines)
+
+
 _BUILDING_SKELETON = """\
 obj=building
 name={name}
 copyright={author}
-type={type}
+type={type}{station}
 
 # --- footprint -----------------------------------------------------------
 # dims = tiles in x, tiles in y [, layouts]. The engine defaults to 1 layout
@@ -305,17 +323,22 @@ retire_year={retire_year}
 
 def building_dat(name, images, btype="res", dims="1,1", level=1, chance=100,
                  author="", intro_year=1900, retire_year=2999,
-                 animation_time=None):
-    """A compilable city-building .dat.
+                 animation_time=None, waytype="", enables=()):
+    """A compilable building .dat.
 
-    btype: res | com | ind | cur (attraction) | tow (townhall) | ... - the value
-    the engine reads from `type=`.
+    btype: res | com | ind | cur (attraction) | tow (townhall) | stop | depot |
+    extension - the value the engine reads from `type=`.
+    waytype: for a stop/depot/extension, the way it serves (track, road, water,
+    air, ...). Empty for a plain city building - and then the output is byte-for-
+    byte what it was before stops existed.
+    enables: any of "pax", "post", "ware" - what a stop accepts.
     animation_time: milliseconds per phase; only meaningful with >1 phase.
     """
+    station = station_block(waytype, enables)
     dat = _BUILDING_SKELETON.format(
         name=name, author=author, type=btype, dims=dims, level=level,
         chance=chance, intro_year=intro_year, retire_year=retire_year,
-        images=images,
+        images=images, station=("\n" + station) if station else "",
     )
     if animation_time is not None:
         dat = dat.replace("# --- graphics",

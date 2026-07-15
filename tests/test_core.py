@@ -1003,6 +1003,45 @@ def test_building_image_block():
           str(schema.lint(dat)))
 
 
+def test_station_and_depot_buildings():
+    """A stop and a depot are obj=building with a type and a waytype.
+
+    Verified against makeobj (exit 0, packs building.BKit_Stop). A stop needs its
+    waytype (building_writer.cc reads it) and enables_* for what it accepts; a
+    plain building emits neither and so comes out byte-for-byte as before.
+    """
+    from core import buildings, schema
+
+    check("station block is empty for a plain building",
+          buildings.station_block("", ()) == "")
+    check("station block emits waytype and enables in order",
+          buildings.station_block("track", ["pax", "ware"])
+          == "waytype=track\nenables_pax=1\nenables_ware=1",
+          buildings.station_block("track", ["pax", "ware"]))
+
+    place = {(0, 0, 0, 0, 0, 0): (0, 0)}
+    block = buildings.image_block("stn", place)
+
+    plain = buildings.building_dat("H", block, btype="res", dims="1,1", level=3)
+    plain2 = buildings.building_dat("H", block, btype="res", dims="1,1", level=3,
+                                    waytype="", enables=())
+    check("adding stop support does not shift a plain building", plain == plain2)
+
+    stop = buildings.building_dat("BKit_Stop", block, btype="stop", dims="1,1",
+                                  level=2, waytype="track", enables=["pax", "post"])
+    check("stop has type and waytype",
+          "\ntype=stop\n" in stop and "\nwaytype=track\n" in stop, stop)
+    check("stop enables passengers and mail",
+          "\nenables_pax=1\n" in stop and "\nenables_post=1\n" in stop, stop)
+    check("stop lints clean", not schema.lint(stop), str(schema.lint(stop)))
+
+    depot = buildings.building_dat("BKit_Depot", block, btype="depot", dims="1,1",
+                                   level=1, waytype="track")
+    check("depot has type and waytype",
+          "\ntype=depot\n" in depot and "\nwaytype=track\n" in depot, depot)
+    check("depot lints clean", not schema.lint(depot), str(schema.lint(depot)))
+
+
 def test_seasons_and_the_third_image_trap():
     """The engine's effective_season table throws a third season image away.
 
