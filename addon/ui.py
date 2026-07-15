@@ -179,15 +179,19 @@ class SimutransProps(PropertyGroup):
                              default=100, min=0)
     intro_year: IntProperty(name="Intro year", translation_context=CTX, default=1900)
 
+    # Two labels that used to both read "Couples ..." and truncated to the same
+    # thing in the narrow sidebar. They now lead with the word that tells them
+    # apart, and match what the field actually lists: the neighbours allowed on
+    # each side.
     constraint_prev: StringProperty(
-        name="Couples behind", translation_context=CTX, default="",
+        name="In front", translation_context=CTX, default="",
         description="Comma-separated vehicle names that may go IN FRONT of this "
                     "one. Use 'none' to allow it at the head of the train. Leave "
                     "EMPTY to couple behind anything - an empty field is not the "
                     "same as 'none'",
     )
     constraint_next: StringProperty(
-        name="Couples in front of", translation_context=CTX, default="",
+        name="Behind", translation_context=CTX, default="",
         description="Comma-separated vehicle names that may go BEHIND this one. "
                     "Use 'none' to allow it at the tail. Leave EMPTY to couple to "
                     "anything",

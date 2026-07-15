@@ -90,11 +90,11 @@ SOURCE_STRINGS = (
     "Cost (cents)",
     "Running cost",
     "Intro year",
-    "Couples behind",
+    "In front",
     "Comma-separated vehicle names that may go IN FRONT of this one. Use 'none' to "
     "allow it at the head of the train. Leave EMPTY to couple behind anything - an "
     "empty field is not the same as 'none'",
-    "Couples in front of",
+    "Behind",
     "Comma-separated vehicle names that may go BEHIND this one. Use 'none' to allow "
     "it at the tail. Leave EMPTY to couple to anything",
     "Align offset",
@@ -292,14 +292,14 @@ SPANISH = {
     "Cost (cents)": "Precio (céntimos)",
     "Running cost": "Coste por km",
     "Intro year": "Año de aparición",
-    "Couples behind": "Se engancha detrás de",
+    "In front": "Delante de",
     "Comma-separated vehicle names that may go IN FRONT of this one. Use 'none' to "
     "allow it at the head of the train. Leave EMPTY to couple behind anything - an "
     "empty field is not the same as 'none'":
         "Nombres de vehículos, separados por comas, que pueden ir DELANTE de éste. "
         "Pon 'none' para permitir que encabece el tren. Déjalo VACÍO para que se "
         "enganche detrás de cualquier cosa: vacío no es lo mismo que 'none'",
-    "Couples in front of": "Se engancha delante de",
+    "Behind": "Detrás de",
     "Comma-separated vehicle names that may go BEHIND this one. Use 'none' to allow "
     "it at the tail. Leave EMPTY to couple to anything":
         "Nombres de vehículos, separados por comas, que pueden ir DETRÁS de éste. "
