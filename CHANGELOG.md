@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.7.0
+
+Pakset profiles measured against the real pakset, not transcribed and hoped.
+
+### Changed
+
+- **The pakset profile is now checked against the pakset's own `simuconf.tab`.**
+  `core/paksets.py` carries numbers that belong to the pakset - `tile_height`, and
+  now `height_conversion_factor` - and its own docstring warned about "the sort of
+  wrong number that waits" until something reads the field (pak128's `tile_height`
+  was 16-for-everyone once, twice too steep). The existing test proved those
+  numbers were self-consistent; consistency is not correctness. A new `profile`
+  test suite reads the real `config/simuconf.tab` of every mounted pakset (the demo
+  pak in the engine source, the pak128 testbed under `build/game`) with the
+  engine's own parsing - `#` a comment only at column 0, values read strtol-style -
+  and asserts the profile equals it. It SKIPS when no pakset is mounted, so CI
+  stays green while a local run verifies against the artefact. `tools/measure_pakset.py`
+  is the instrument.
+
+### Added
+
+- **`height_conversion_factor` in the profile, measured (pak128 = 2, demo pak = 1).**
+  With factor 2 the engine turns a terrain step into a DOUBLE-height slope
+  (`slope_from_slope4`, grund.cc / tunnelboden.cc / brueckenboden.cc), so pak128's
+  ordinary hill is double. That makes the double-slope way/wayobj image (`imageup2`,
+  the `way_slope2` model) the common case for pak128, not the optional decoration
+  it is for a factor-1 pakset. The profile exposes `double_slope_default` and the
+  double ramp's rise (`double_slope_rise_px` / `_world`, exactly two single levels)
+  for the artist. No artist-visible output changed; this is reference data made
+  trustworthy.
+
 ## 0.6.0
 
 The release that finished the object types: everything a pakset is built from can

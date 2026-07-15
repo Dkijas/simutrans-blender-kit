@@ -140,6 +140,78 @@ def test_height_step_is_the_paksets_own():
               "%.4f px vs %.4f" % (drawn, pak.height_rise_px))
 
 
+def test_height_conversion_factor_and_double_slopes():
+    """The factor is the pakset's, and a double slope is exactly two levels.
+
+    settings.cc:1342 reads `height_conversion_factor` (clamped 1..2) and feeds it
+    to slope_from_slope4(): factor 2 makes a terrain step a DOUBLE-height slope, so
+    pak128's ordinary hill is double and its way_slope2 image is the common case,
+    not the optional decoration ways.py describes for a factor-1 pakset.
+    """
+    check("pak128 is double-slope by default", paksets.PAK128.double_slope_default)
+    check("the demo pakset is not", not paksets.PAK64.double_slope_default)
+    check("the engine default (pak256) is not",
+          not paksets.PAK256.double_slope_default)
+
+    for pak in (paksets.PAK64, paksets.PAK128):
+        check("%s: a double slope rises two single levels" % pak.name,
+              abs(pak.double_slope_rise_px - 2 * pak.height_rise_px) < 1e-9,
+              "%.3f" % pak.double_slope_rise_px)
+        # The double ramp the artist models (way_slope2) must lift exactly that.
+        drawn = projection.project_camera(0.0, 0.0, pak.double_slope_rise_world,
+                                          pak.tile_px, pak.tile_world)[1]
+        check("%s: the way_slope2 ramp draws two height levels" % pak.name,
+              abs(drawn - pak.double_slope_rise_px) < 1e-6,
+              "%.4f px vs %.4f" % (drawn, pak.double_slope_rise_px))
+
+
+def test_measure_pakset_reads_the_tab_like_the_engine():
+    """The profile-measuring tool must read a simuconf.tab the way tabfile.cc does.
+
+    Two rules, both from tabfile.cc: a '#' opens a comment ONLY at column 0
+    (read_line, tabfile.cc:523), so a '#' after a value is literal; and a numeric
+    value is read with strtol, which takes the leading integer and stops at the
+    first non-digit. Get either wrong and the measurement diverges from what the
+    engine actually loads - which would defeat the whole point of measuring.
+    """
+    from tools import measure_pakset
+
+    check("strtol takes the leading int", measure_pakset._leading_int("8") == 8)
+    check("...and stops at a trailing '# comment', not treating it as special",
+          measure_pakset._leading_int("8 # steeper than pak64") == 8)
+    check("...and honours a sign", measure_pakset._leading_int("+2") == 2)
+    try:
+        measure_pakset._leading_int("nan")
+        check("a non-numeric value is refused", False)
+    except ValueError:
+        check("a non-numeric value is refused", True)
+
+    tab = ("# a whole-line comment at column 0 is skipped\n"
+           "tile_height = 8\n"
+           "  # an indented comment line is skipped too\n"
+           "height_conversion_factor = 2\n")
+    d = tempfile.mkdtemp()
+    conf_dir = os.path.join(d, "config")
+    os.makedirs(conf_dir)
+    with open(os.path.join(conf_dir, "simuconf.tab"), "w", encoding="utf-8") as f:
+        f.write(tab)
+    m = measure_pakset.measure(d)
+    check("measures tile_height from the file", m["tile_height"] == 8)
+    check("measures the conversion factor", m["height_conversion_factor"] == 2)
+
+    # An absent factor falls back to the engine default of 1 (environment.cc:43).
+    with open(os.path.join(conf_dir, "simuconf.tab"), "w", encoding="utf-8") as f:
+        f.write("tile_height = 16\n")
+    check("a pakset that omits the factor gets the engine default 1",
+          measure_pakset.measure(d)["height_conversion_factor"] == 1)
+
+    # And the clamp: the engine bounds the factor to 1..2 (settings.cc:1342).
+    with open(os.path.join(conf_dir, "simuconf.tab"), "w", encoding="utf-8") as f:
+        f.write("tile_height = 8\nheight_conversion_factor = 9\n")
+    check("an out-of-range factor is clamped to 2, as the engine clamps it",
+          measure_pakset.measure(d)["height_conversion_factor"] == 2)
+
+
 # ---------------------------------------------------------------- directions
 def test_dir_codes_match_engine():
     check("dir order == vehicle_writer.cc",

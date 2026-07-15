@@ -34,6 +34,30 @@ height_step  the pakset's own `tile_height`, straight out of its
 
              pak192 and pak256 are NOT measured - we do not have them here. They
              carry the engine's default and are marked below.
+
+height_conversion_factor
+             the pakset's `height_conversion_factor`, from the same simuconf.tab
+             (settings.cc:1342 -> env_t::pak_height_conversion_factor, clamped to
+             1..2). The engine multiplies terrain heights by it and, crucially,
+             feeds it to slope_from_slope4() (grund.cc:240, tunnelboden.cc:110,
+             brueckenboden.cc:82): with factor 2 a single terrain step becomes a
+             DOUBLE-height slope, so the pakset's hills are double by default.
+
+             It does not change any pixel of a given image - a double-slope image
+             always spans two height levels. What it changes is WHICH image is the
+             common case. ways.py calls the double-slope image (imageup2 / the
+             way_slope2 model) "optional" and "merely ugly to skip", and for a
+             factor-1 pakset that is true. For pak128 it is NOT: factor 2 makes
+             the double slope the ordinary hill, so a pak128 way that omits its
+             way_slope2 stretches a single-height image over every normal hill.
+
+             MEASURED, from the paksets themselves:
+
+                 pak (the demo pakset, 64px)   factor = 1   single-height hills
+                 pak128                        factor = 2   double-height hills
+
+             Default is 1 (environment.cc:43); pak192/pak256 are unmeasured and
+             carry it.
 """
 
 from dataclasses import dataclass
@@ -47,6 +71,7 @@ class Pakset:
     tile_px: int
     tile_world: float = 2.0
     height_step: int = 16
+    height_conversion_factor: int = 1
 
     @property
     def ortho_scale(self) -> float:
@@ -69,13 +94,35 @@ class Pakset:
         return projection.height_rise_px(self.height_step, self.tile_px)
 
     @property
+    def double_slope_default(self) -> bool:
+        """Are this pakset's hills double-height by default? (factor == 2).
+
+        When true, the double-slope way/wayobj images (imageup2, the way_slope2
+        model) are the ORDINARY case, not optional decoration - an artist who
+        skips them stretches a single-height image over every normal hill.
+        """
+        return self.height_conversion_factor == 2
+
+    @property
+    def double_slope_rise_px(self) -> float:
+        """Screen pixels a DOUBLE-height slope rises: two height levels."""
+        return 2.0 * self.height_rise_px
+
+    @property
+    def double_slope_rise_world(self) -> float:
+        """Blender units a double-slope ramp (way_slope2) must rise: 2x single."""
+        return 2.0 * self.height_world
+
+    @property
     def makeobj_arg(self) -> str:
         """The command makeobj wants: `makeobj pak128 out.pak src/`."""
         return "pak" if self.tile_px == 64 else "pak%d" % self.tile_px
 
 
-PAK64 = Pakset("pak64", 64, height_step=16)     # measured: simutrans/pak/config
-PAK128 = Pakset("pak128", 128, height_step=8)   # measured: pak128/config/simuconf.tab
+# measured: simutrans/pak/config/simuconf.tab   -> tile_height 16, factor 1
+PAK64 = Pakset("pak64", 64, height_step=16, height_conversion_factor=1)
+# measured: pak128/config/simuconf.tab          -> tile_height  8, factor 2
+PAK128 = Pakset("pak128", 128, height_step=8, height_conversion_factor=2)
 PAK192 = Pakset("pak192", 192)                  # NOT measured - the engine default
 PAK256 = Pakset("pak256", 256)                  # NOT measured - the engine default
 

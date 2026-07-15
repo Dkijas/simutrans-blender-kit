@@ -190,6 +190,16 @@ def suite_schema():
     return r
 
 
+def suite_profile():
+    """Does each pakset profile match the real pakset's own simuconf.tab?"""
+    r = _run([sys.executable, os.path.join("tests", "test_pakset_profile.py")],
+             ROOT, r"\bPROFILE_OK\b", (r"\bPROFILE_FAILED\b", r"Traceback"), 120,
+             "profile")
+    if not r.ok and "PROFILE_SKIP" in r.detail:
+        r.skipped = True
+    return r
+
+
 def _blender(script, sentinel, extra=(), script_args=()):
     if not BLENDER:
         return Result(script, False, "no Blender found (put it on PATH, or set"
@@ -476,6 +486,7 @@ SUITES = {
     "core": suite_core,
     "schema": suite_schema,
     "colours": suite_colours,
+    "profile": suite_profile,
     "e2e": suite_blender_e2e,
     "alignment": suite_blender_alignment,
     "building": suite_blender_building,
@@ -510,7 +521,7 @@ SUITES = {
 }
 # Producers first, then the .pak they feed, then the game. The order IS the loop:
 # nothing downstream of "paks" can pass on art that this run did not render.
-ORDER = ("core", "schema", "colours",
+ORDER = ("core", "schema", "colours", "profile",
          # producers: the art and the .dat
          "e2e", "alignment", "building", "footprint", "way", "freight", "tunnel",
          "bridge", "infra", "addon", "panel", "demo-all", "demo-loco",
