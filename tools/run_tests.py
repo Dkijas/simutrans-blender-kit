@@ -90,6 +90,7 @@ PAK_BUILDS = (
     (("house", "bkitstop.dat"),     "pak128", "bkitstop.pak"),
     (("freight", "bkithopper.dat"), "pak128", "bkithopper.pak"),
     (("tunnel", "bkittunnel.dat"),  "pak128", "bkittunnel.pak"),
+    (("bridge", "bkitbridge.dat"),  "pak128", "bkitbridge.pak"),
     (("way", "bkitroad.dat"),       "pak128", "bkitroad.pak"),
     (("infra", "bkitwire.dat"),     "pak128", "bkitwire.pak"),
     (("infra", "bkitsignal.dat"),   "pak128", "bkitsignal.pak"),
@@ -445,6 +446,11 @@ def suite_game_stop():
     return _game("bkitstop", r"BKITSTOP_OK", "game:stop")
 
 
+def suite_game_bridge():
+    """The generated bridge loads and is in the engine's own bridge builder list."""
+    return _game("bkitbridge", r"BKITBRIDGE_OK", "game:bridge")
+
+
 def suite_game_civia():
     """One click on the cab car has to give five cars, in order, and they must run."""
     return _game128("civia465", r"CIVIA465_OK", "game:civia")
@@ -485,6 +491,7 @@ SUITES = {
     "hopper": suite_game_hopper,
     "tunnel-game": suite_game_tunnel,
     "stop": suite_game_stop,
+    "bridge-game": suite_game_bridge,
     "house": suite_game_house,
     "road": suite_game_road,
     "game-infra": suite_game_infra,
@@ -503,8 +510,8 @@ ORDER = ("core", "schema", "colours",
          # the .pak the game will load, compiled from what was just rendered
          "paks",
          # the game, against the demo pakset
-         "catalogue", "running", "hopper", "tunnel-game", "stop", "house", "road",
-         "game-infra", "game-all",
+         "catalogue", "running", "hopper", "tunnel-game", "stop", "bridge-game",
+         "house", "road", "game-infra", "game-all",
          # the game, against a real pakset - these build and install their own
          "asset-civia", "civia", "asset-metro9k",
          "game-civia", "game-metro9k", "game-metro9k-line")
