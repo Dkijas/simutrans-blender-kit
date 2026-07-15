@@ -38,6 +38,9 @@ broken art ship green.
 - **Render warnings reach the panel.** Clipping and accidental-reserved-colour
   warnings used to print to a console no artist has open while the panel said
   "Rendered". They are reported in the panel now.
+- **Write .dat without re-rendering.** Change a number — power, cost, a coupling —
+  and rewrite the `.dat` from the last render's frames instead of rendering every
+  heading again.
 - **Linter: value validation, rule codes, `--json`, and an ignore pragma.** It
   checks that a number key is given a number, tags each finding with a stable code,
   can emit JSON, and honours `# bkit: ignore=<code>`. Two silent bugs fixed: it
