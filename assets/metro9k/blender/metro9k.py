@@ -71,7 +71,9 @@ PAKSET = "pak128"
 PAK = paksets.get(PAKSET)
 TW = PAK.tile_world
 
-AUTHOR = "simutrans-blender-kit"
+# The artist who modelled it, not the tool. See civia465.py for the reasoning:
+# copyright= is the modeller's credit and this geometry is victor_18993's.
+AUTHOR = "victor_18993"
 METRES_PER_TILE = 25.0          # APPROXIMATION. See the module docstring.
 
 # --------------------------------------------------------------------- palette

@@ -71,7 +71,10 @@ PAKSET = "pak128"
 PAK = paksets.get(PAKSET)
 TW = PAK.tile_world
 
-AUTHOR = "simutrans-blender-kit"
+# The person who modelled this, not the tool that rendered it. copyright= in a
+# .dat is the ARTIST's credit; signing it "simutrans-blender-kit" put the kit's
+# name on somebody's work. The geometry here is victor_18993's.
+AUTHOR = "victor_18993"
 METRES_PER_TILE = 25.0          # APPROXIMATION. See the module docstring.
 
 # --------------------------------------------------------------------- palette
