@@ -357,6 +357,11 @@ def suite_blender_tunnel():
     return _blender("blender_tunnel.py", "TUNNEL_OK")
 
 
+def suite_blender_bridge():
+    """A bridge: span, start, ramp and pillar, each turned, in two layers."""
+    return _blender("blender_bridge.py", "BRIDGE_OK")
+
+
 def suite_game_house():
     """Can the generated house actually be planted on the map?"""
     return _game("bkithouse", r"BKITHOUSE_OK", "game:house")
@@ -466,6 +471,7 @@ SUITES = {
     "way": suite_blender_way,
     "freight": suite_blender_freight,
     "tunnel": suite_blender_tunnel,
+    "bridge": suite_blender_bridge,
     "infra": suite_blender_infra,
     "addon": suite_blender_addon,
     "panel": suite_blender_panel,
@@ -493,7 +499,7 @@ SUITES = {
 ORDER = ("core", "schema", "colours",
          # producers: the art and the .dat
          "e2e", "alignment", "building", "footprint", "way", "freight", "tunnel",
-         "infra", "addon", "panel", "demo-all", "demo-loco",
+         "bridge", "infra", "addon", "panel", "demo-all", "demo-loco",
          # the .pak the game will load, compiled from what was just rendered
          "paks",
          # the game, against the demo pakset

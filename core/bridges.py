@@ -27,6 +27,21 @@ GROUPS = (
     ("pillar", ("s", "w")),
 )
 
+# The collection an artist models each group in (the span is friendlier than
+# "image"), and the quarter-turns of that base model for each of its directions.
+# Turns are DERIVED by analogy with the way/slope conventions (ns is the base
+# span, a direction turns like a slope facing it); the facing/heading reflection
+# is the one the way slopes proved you confirm in game, so a placed bridge is the
+# final word - see the game scenario.
+GROUP_COLLECTION = {"image": "span", "start": "start",
+                    "ramp": "ramp", "pillar": "pillar"}
+GROUP_TURNS = {
+    "image":  {"ns": 0, "ew": 1},
+    "start":  {"n": 0, "e": 1, "s": 2, "w": 3},
+    "ramp":   {"n": 0, "e": 1, "s": 2, "w": 3},
+    "pillar": {"s": 0, "w": 1},
+}
+
 
 def image_block(basename, back, front=None):
     """back<group>[dir] / front<group>[dir] lines, in the writer's order.

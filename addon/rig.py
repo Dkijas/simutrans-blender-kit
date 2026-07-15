@@ -22,14 +22,14 @@ import sys
 
 try:
     # installed in Blender: we are <addon-package>.addon.rig
-    from ..core import (buildings, colors, datgen, directions, paksets,
+    from ..core import (bridges, buildings, colors, datgen, directions, paksets,
                         projection, roadsigns, sheet, tunnels, ways)
 except ImportError:
     # run straight from a checkout (the tests, and `blender --python ...`)
     _HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if _HERE not in sys.path:
         sys.path.insert(0, _HERE)
-    from core import (buildings, colors, datgen, directions, paksets,
+    from core import (bridges, buildings, colors, datgen, directions, paksets,
                       projection, roadsigns, sheet, tunnels, ways)
 
 CAM_NAME = "SIMUTRANS_CAM"
@@ -1221,6 +1221,115 @@ def build_tunnel_sheet_and_dat(portals, out_dir, pakset_name="pak128",
     ui = tunnels.icon_block(basename, back, icon_dir=icon_dir)
 
     dat_text = tunnels.tunnel_dat(dat_kwargs.pop("name", basename), block, ui,
+                                  **dat_kwargs)
+    dat_path = os.path.join(out_dir, "%s.dat" % basename)
+    with open(dat_path, "w", encoding="utf-8") as f:
+        f.write(dat_text)
+    return sheet_png, dat_path, back
+
+
+BRIDGE_COLLECTION_PREFIX = "bridge_"
+
+
+def has_bridge_model(bpy, prefix=BRIDGE_COLLECTION_PREFIX):
+    """Is there at least a bridge_span collection to render?"""
+    return any(c.name == prefix + "span" and c.objects
+               for c in bpy.data.collections)
+
+
+def _has_collection(bpy, name):
+    return any(c.name == name and c.objects for c in bpy.data.collections)
+
+
+def _bridge_layer_setup(bpy, collection, layer, prefix=BRIDGE_COLLECTION_PREFIX):
+    """Show one bridge piece's back or front parts alone."""
+    wanted = prefix + collection + ("_front" if layer == "front" else "")
+    for col in bpy.data.collections:
+        if not col.name.startswith(prefix):
+            continue
+        hide = col.name != wanted
+        for ob in col.objects:
+            ob.hide_render = hide
+
+
+def render_bridge_pieces(bpy, out_dir, pakset_name="pak128", basename="bridge",
+                         distance=20.0, align_offset=(0.0, 0.0, 0.0)):
+    """Render every bridge piece in its directions and layers.
+
+    -> {"back": {group: [(dir, path), ...]}, "front": {group: [...]}}.
+
+    Groups (bridges.GROUPS): the span (collection bridge_span) in ns/ew, the start
+    and ramp (bridge_start, bridge_ramp) in n/s/e/w, the pillar (bridge_pillar) in
+    s/w - each turned by bridges.GROUP_TURNS on the camera the way pieces are
+    proven on. back is the far side of the deck, drawn behind the vehicle;
+    bridge_<piece>_front holds the near railing drawn over it, and is optional per
+    piece (the catenary split).
+    """
+    target = tile_anchor(pakset_name, align_offset)
+    build_rig(bpy, pakset_name, distance, target=target)
+    cam = bpy.data.objects[CAM_NAME]
+    scene = bpy.context.scene
+    out_dir = _prepare_out(out_dir)
+
+    result = {"back": {}, "front": {}}
+    for group, dirs in bridges.GROUPS:
+        collection = bridges.GROUP_COLLECTION[group]
+        turns = bridges.GROUP_TURNS[group]
+        for layer in ("back", "front"):
+            if layer == "front" and not _has_collection(
+                    bpy, BRIDGE_COLLECTION_PREFIX + collection + "_front"):
+                continue
+            _bridge_layer_setup(bpy, collection, layer)
+            frames = []
+            for d in dirs:
+                az = ways.azimuth_for(turns[d])
+                cam.rotation_euler = tuple(math.radians(a)
+                                           for a in (projection_rot_x(), 0.0, az))
+                cam.location = _camera_location(distance, az, 30.0, target)
+                aim_sun(bpy, az)
+                path = os.path.join(out_dir, "%s_%s_%s_%s.png"
+                                    % (basename, layer, group, d))
+                scene.render.filepath = path
+                bpy.ops.render.render(write_still=True)
+                frames.append((d, path))
+            result[layer][group] = frames
+    return result
+
+
+def build_bridge_sheet_and_dat(pieces, out_dir, pakset_name="pak128",
+                               basename="bridge", cols=4, **dat_kwargs):
+    """Assemble every bridge piece into one sheet and write the .dat.
+
+    pieces: {"back": {group: [(dir, path)...]}, "front": {...}} from
+    render_bridge_pieces. Every image shares the sheet, keyed by (layer, group,
+    dir), and is sliced back out into the {group: {dir: cell}} shape image_block
+    wants - the same way build_way_sheet_and_dat tells flat from slope.
+    """
+    pak = paksets.get(pakset_name)
+    out_dir = _prepare_out(out_dir)
+    sheet_png = os.path.join(out_dir, "%s.png" % basename)
+
+    all_frames = []
+    for layer in ("back", "front"):
+        for group, frames in pieces.get(layer, {}).items():
+            all_frames += [((layer, group, d), p) for d, p in frames]
+    cells = sheet.assemble(all_frames, pak.tile_px, cols=cols, out_path=sheet_png)
+
+    warn_if_reserved_colors(bpy_module(), sheet_png, what="the bridge sheet")
+
+    def placement(layer):
+        out = {}
+        for (lay, group, d), v in cells.items():
+            if lay == layer:
+                out.setdefault(group, {})[d] = v
+        return out
+
+    back = placement("back")
+    front = placement("front")
+    block = bridges.image_block(basename, back, front or None)
+    ui = bridges.icon_block(basename, back)
+
+    dat_text = bridges.bridge_dat(dat_kwargs.pop("name", basename), block, ui,
                                   **dat_kwargs)
     dat_path = os.path.join(out_dir, "%s.dat" % basename)
     with open(dat_path, "w", encoding="utf-8") as f:
