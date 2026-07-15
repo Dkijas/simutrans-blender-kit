@@ -219,6 +219,37 @@ class SimutransProps(PropertyGroup):
     )
     write_dat: BoolProperty(name="Write .dat", translation_context=CTX, default=True)
 
+    # --- materials.
+    #
+    # rig.make_special_color_material and friends are the whole reason the kit
+    # exists - a player-colour patch that the engine recolours per company, a window
+    # that lights up at night - and until now they had NO button. An artist who did
+    # not write Python could not paint one. These do.
+    material: EnumProperty(
+        name="Material", translation_context=CTX,
+        items=[
+            ("player", "Player colour", "recoloured per company. Emission, so it "
+                                        "survives to the pak exactly"),
+            ("window", "Window (warm)", "dark by day, warm yellow at night"),
+            ("window_blue", "Window (blue)", "lit blue at night"),
+            ("headlight", "Headlight", "near-white by day, yellow after dark"),
+            ("lamp_red", "Red lamp", "a red light, day and night"),
+            ("lamp_green", "Green lamp", "a green light"),
+            ("lamp_yellow", "Yellow lamp", "a yellow light"),
+            ("signal_purple", "Signal (purple)", "the purple signal lamp - you paint "
+                                                 "#FF017F, the game draws #E100E1"),
+            ("paint", "Plain paint", "an ordinary LIT colour - a roof, a hull. Uses "
+                                     "the colour below"),
+        ],
+        default="player",
+    )
+    paint_color: FloatVectorProperty(
+        name="Paint", translation_context=CTX, subtype="COLOR",
+        size=3, min=0.0, max=1.0, default=(0.5, 0.5, 0.5),
+        description="The colour for Plain paint. The reserved materials above ignore "
+                    "it - their colour is fixed by the engine",
+    )
+
 
 # WHAT TO MODEL, said in the panel, at the moment it matters. An artist should not
 # have to go and read a README to find out that a way is six collections. The first
@@ -567,6 +598,56 @@ class SIMUTRANS_OT_night_preview(Operator):
         return {"FINISHED"}
 
 
+# The reserved materials, by the enum value the panel offers. Each is (the rgb the
+# ARTIST paints, whether it is a reserved special colour). The colour is the one
+# makeobj matches against - colors.LAMP_PURPLE is #FF017F, not the #E100E1 the game
+# draws - which is the whole reason these go through one place.
+_MATERIALS = {
+    "window": (colors.WINDOW_DARK, True),
+    "window_blue": (colors.WINDOW_LIGHT, True),
+    "headlight": (colors.HEADLIGHT, True),
+    "lamp_red": (colors.LAMP_RED, True),
+    "lamp_green": (colors.LAMP_GREEN, True),
+    "lamp_yellow": (colors.LAMP_YELLOW, True),
+    "signal_purple": (colors.LAMP_PURPLE, True),
+    # a mid shade of the blue ramp: the engine recolours the whole ramp per company,
+    # and painting one shade is what marks the region as player-colour
+    "player": (colors.PLAYER_RAMP_BLUE[3], True),
+}
+
+
+class SIMUTRANS_OT_apply_material(Operator):
+    bl_idname = "simutrans.apply_material"
+    bl_label = "Apply to selected"
+    bl_translation_context = CTX
+    bl_description = ("Give the selected objects a Simutrans material - a "
+                      "player colour, a night light, or plain paint")
+
+    def execute(self, context):
+        p = context.scene.simutrans
+
+        meshes = [ob for ob in context.selected_objects if ob.type == "MESH"]
+        if not meshes:
+            say(self, {"ERROR"}, _("Select a mesh object first"))
+            return {"CANCELLED"}
+
+        if p.material == "paint":
+            rgb = tuple(int(round(c * 255)) for c in p.paint_color)
+            mat = rig.make_paint_material(bpy, rgb)
+        else:
+            rgb, _reserved = _MATERIALS[p.material]
+            mat = rig.make_special_color_material(bpy, rgb)
+
+        for ob in meshes:
+            if ob.data.materials:
+                ob.data.materials[0] = mat
+            else:
+                ob.data.materials.append(mat)
+
+        say(self, {"INFO"}, _("%s -> %d object(s)") % (mat.name, len(meshes)))
+        return {"FINISHED"}
+
+
 class SIMUTRANS_OT_compile_pak(Operator):
     bl_idname = "simutrans.compile_pak"
     bl_label = "Compile .pak"
@@ -656,6 +737,13 @@ class SIMUTRANS_PT_panel(Panel):
         box.operator("simutrans.build_rig", icon="OUTLINER_OB_CAMERA")
 
         box = col.box()
+        box.label(text="Materials", icon="MATERIAL", text_ctxt=CTX)
+        box.prop(p, "material")
+        if p.material == "paint":
+            box.prop(p, "paint_color")
+        box.operator("simutrans.apply_material", icon="BRUSH_DATA")
+
+        box = col.box()
         box.label(text="Output", icon="RENDER_RESULT", text_ctxt=CTX)
         box.prop(p, "out_dir")
 
@@ -740,7 +828,8 @@ class SIMUTRANS_PT_dat(Panel):
 
 CLASSES = (SimutransProps, SIMUTRANS_OT_build_rig, SIMUTRANS_OT_render_sheet,
            SIMUTRANS_OT_check_colors, SIMUTRANS_OT_night_preview,
-           SIMUTRANS_OT_compile_pak, SIMUTRANS_PT_panel, SIMUTRANS_PT_dat)
+           SIMUTRANS_OT_apply_material, SIMUTRANS_OT_compile_pak,
+           SIMUTRANS_PT_panel, SIMUTRANS_PT_dat)
 
 
 _TRANSLATION_DOMAIN = "simutrans_blender_kit"

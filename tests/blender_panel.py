@@ -106,6 +106,21 @@ def press_and_catch(props, basename):
     return result, list(ui_mod.REPORTS)
 
 
+def press_material_and_catch(props):
+    """Press Apply Material and read back what it reported. See press_and_catch.
+
+    bpy.ops raises when an operator returns CANCELLED, which is exactly the case
+    under test (nothing selected), so the report is read regardless.
+    """
+    from simutrans_blender_kit.addon import ui as ui_mod
+    del ui_mod.REPORTS[:]
+    try:
+        result = bpy.ops.simutrans.apply_material()
+    except RuntimeError:
+        result = {"CANCELLED"}
+    return result, list(ui_mod.REPORTS)
+
+
 def dat_of(basename):
     path = os.path.join(OUT, "%s.dat" % basename)
     if not os.path.exists(path):
@@ -325,6 +340,55 @@ def main():
     _result, quiet = press_and_catch(p, "pfits")
     check("a model that fits raises no clipping warning",
           not any("does not fit" in m for _l, m in quiet), str(quiet))
+
+    # --- CAN AN ARTIST PAINT A PLAYER COLOUR WITHOUT WRITING PYTHON?
+    #
+    # This is the reason the kit exists, and until now it had no button: the
+    # material functions were reachable only from a script. An artist selects a
+    # mesh, picks "Player colour", presses the button - and the pixels that come
+    # out have to be a player colour the engine will actually recolour.
+    clear()
+    p.obj_type = "vehicle"
+    p.dirs = "4"
+    ob = cube(sx=0.4, sy=0.4, sz=0.3)
+
+    ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
+    p.material = "player"
+    result = bpy.ops.simutrans.apply_material()
+    check("the Apply Material button runs", result == {"FINISHED"}, str(result))
+    check("the object came away with a material", bool(ob.data.materials))
+
+    render(p, "pplayer")
+    _w, _h, alpha, px = sheet.read_png(os.path.join(OUT, "pplayer.png"))
+    body = [(q[0], q[1], q[2]) for q in px if not (alpha and q[3] == 0)]
+    hits = colors.scan(body)
+    player_hits = sum(n for rgb, n in hits.items()
+                      if colors.classify(rgb) and "player" in colors.classify(rgb))
+    check("...and the rendered sprite really is player-colour, exactly",
+          player_hits > 50, "%d player-colour pixels (hits: %r)"
+          % (player_hits, {("#%02X%02X%02X" % k): v for k, v in hits.items()}))
+
+    # a night light next, because that is the other material an artist cannot reach
+    clear()
+    ob = cube(sx=0.4, sy=0.4, sz=0.3)
+    ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
+    p.material = "signal_purple"
+    bpy.ops.simutrans.apply_material()
+    render(p, "ppurple")
+    _w, _h, alpha, px = sheet.read_png(os.path.join(OUT, "ppurple.png"))
+    body = [(q[0], q[1], q[2]) for q in px if not (alpha and q[3] == 0)]
+    check("the purple signal lamp is the colour makeobj matches (#FF017F)",
+          colors.LAMP_PURPLE in body,
+          "not one #FF017F pixel - a signal painted from the panel would not light")
+
+    # and the button must refuse when nothing is selected, rather than do nothing
+    clear()
+    p.material = "player"
+    _r, reported = press_material_and_catch(p)
+    check("with nothing selected, the button says so",
+          any("ERROR" in level for level, _m in reported), str(reported))
 
     print("\nout: %s" % OUT)
     if FAILED:

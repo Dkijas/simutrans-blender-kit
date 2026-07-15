@@ -132,6 +132,26 @@ SOURCE_STRINGS = (
     ".dat: %d error(s), %d warning(s)",
     ".dat line %d: %s",
     "%s + %s, with %d warning(s) above",
+    # --- materials: the reserved colours the kit exists to make reachable
+    "Materials",
+    "Material",
+    "Paint",
+    "Apply to selected",
+    "Give the selected objects a Simutrans material - a player colour, a night "
+    "light, or plain paint",
+    "Select a mesh object first",
+    "%s -> %d object(s)",
+    "The colour for Plain paint. The reserved materials above ignore it - their "
+    "colour is fixed by the engine",
+    "Player colour",
+    "Window (warm)",
+    "Window (blue)",
+    "Headlight",
+    "Red lamp",
+    "Green lamp",
+    "Yellow lamp",
+    "Signal (purple)",
+    "Plain paint",
     # --- what kind of object
     "Object",
     "Vehicle",
@@ -323,6 +343,31 @@ SPANISH = {
     ".dat: %d error(s), %d warning(s)": ".dat: %d error(es), %d aviso(s)",
     ".dat line %d: %s": ".dat línea %d: %s",
     "%s + %s, with %d warning(s) above": "%s + %s, con %d aviso(s) arriba",
+
+    # --- materials
+    "Materials": "Materiales",
+    "Material": "Material",
+    "Paint": "Pintura",
+    "Apply to selected": "Aplicar a lo seleccionado",
+    "Give the selected objects a Simutrans material - a player colour, a night "
+    "light, or plain paint":
+        "Da a los objetos seleccionados un material de Simutrans: color de jugador, "
+        "una luz nocturna o pintura normal",
+    "Select a mesh object first": "Selecciona antes un objeto de malla",
+    "%s -> %d object(s)": "%s -> %d objeto(s)",
+    "The colour for Plain paint. The reserved materials above ignore it - their "
+    "colour is fixed by the engine":
+        "El color de la pintura normal. Los materiales reservados de arriba lo "
+        "ignoran: su color lo fija el motor",
+    "Player colour": "Color de jugador",
+    "Window (warm)": "Ventana (cálida)",
+    "Window (blue)": "Ventana (azul)",
+    "Headlight": "Faro",
+    "Red lamp": "Luz roja",
+    "Green lamp": "Luz verde",
+    "Yellow lamp": "Luz amarilla",
+    "Signal (purple)": "Señal (morada)",
+    "Plain paint": "Pintura normal",
 
     # --- what kind of object, and everything that hangs off it
     "Object": "Objeto",
