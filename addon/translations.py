@@ -125,6 +125,9 @@ SOURCE_STRINGS = (
     "the .blend', and there isn't one yet)",
     "Nothing to render - the scene has no mesh",
     "Rendered %d frames to %s",
+    "Rendering %d headings - Esc to cancel",
+    "Rendering heading %d/%d - Esc to cancel",
+    "Render cancelled at heading %d/%d",
     "No sheet yet - render one first",
     "No reserved colours - nothing will be recoloured",
     # This used to end with "- see the console", and that WAS the bug: the artist
@@ -344,6 +347,12 @@ SPANISH = {
     "Nothing to render - the scene has no mesh":
         "No hay nada que renderizar: la escena no tiene ninguna malla",
     "Rendered %d frames to %s": "%d fotogramas renderizados en %s",
+    "Rendering %d headings - Esc to cancel":
+        "Renderizando %d orientaciones - Esc para cancelar",
+    "Rendering heading %d/%d - Esc to cancel":
+        "Renderizando orientación %d/%d - Esc para cancelar",
+    "Render cancelled at heading %d/%d":
+        "Render cancelado en la orientación %d/%d",
     "No sheet yet - render one first": "Todavía no hay hoja: renderiza una primero",
     "No reserved colours - nothing will be recoloured":
         "Sin colores reservados: no se repintará nada",

@@ -521,25 +521,114 @@ class SIMUTRANS_OT_render_sheet(Operator):
             return {"CANCELLED"}
 
         raised = rig.warnings_since(mark)
-        for message in raised:
-            say(self, {"WARNING"}, message)
+        return _report_render_result(self, p, out, frames, sheet_png, dat_path, raised)
 
-        if dat_path is None:
-            say(self, {"INFO"}, _("Rendered %d frames to %s") % (len(frames), out))
-            return {"FINISHED"}
+    def invoke(self, context, event):
+        # A click in the panel steps the VEHICLE render heading-by-heading, so the
+        # panel can show progress and Esc can cancel it. Every other object type -
+        # and every scripted call, bpy.ops...render_sheet() (EXEC, which the tests
+        # use), goes to execute() unchanged: bpy.ops.render.render is itself
+        # blocking, so a modal only buys an update-and-cancel point BETWEEN
+        # headings, and only the vehicle path renders one still per heading.
+        if context.scene.simutrans.obj_type != "vehicle":
+            return self.execute(context)
+        return self._invoke_vehicle_modal(context)
 
-        if _report_lint(self, dat_path):
-            return {"FINISHED"}
+    def _invoke_vehicle_modal(self, context):
+        p = context.scene.simutrans
+        out, why = _out_dir(p)
+        if out is None:
+            say(self, {"ERROR"}, why)
+            return {"CANCELLED"}
+        mins, maxs = rig.scene_bounds(bpy)
+        if maxs[2] <= mins[2]:
+            say(self, {"ERROR"}, _("Nothing to render - the scene has no mesh"))
+            return {"CANCELLED"}
 
-        if raised:
-            say(self, {"WARNING"}, _("%s + %s, with %d warning(s) above")
-                        % (os.path.basename(sheet_png),
-                           os.path.basename(dat_path), len(raised)))
-            return {"FINISHED"}
+        self._out = out
+        self._mark = rig.warning_mark()
+        self._plan, self._codes = rig.prepare_directions(
+            bpy, out, p.pakset, dirs=int(p.dirs), basename=p.basename,
+            align_offset=tuple(p.align_offset))
+        self._i = 0
+        self._frames = []
 
-        say(self, {"INFO"}, "%s + %s"
-                    % (os.path.basename(sheet_png), os.path.basename(dat_path)))
+        wm = context.window_manager
+        wm.progress_begin(0, len(self._codes))
+        self._timer = wm.event_timer_add(0.01, window=context.window)
+        wm.modal_handler_add(self)
+        context.workspace.status_text_set(
+            _("Rendering %d headings - Esc to cancel") % len(self._codes))
+        return {"RUNNING_MODAL"}
+
+    def modal(self, context, event):
+        if event.type == "ESC":
+            self._teardown(context)
+            # A cancelled render is left on disk but NOT recorded: half a sheet must
+            # never stand in for a whole one, so Write .dat has nothing to build from.
+            say(self, {"WARNING"}, _("Render cancelled at heading %d/%d")
+                % (self._i, len(self._codes)))
+            return {"CANCELLED"}
+        if event.type != "TIMER":
+            return {"RUNNING_MODAL"}
+
+        if self._i < len(self._codes):
+            self._frames.append(
+                rig.render_one_step(bpy, self._plan, self._codes[self._i]))
+            self._i += 1
+            context.window_manager.progress_update(self._i)
+            context.workspace.status_text_set(
+                _("Rendering heading %d/%d - Esc to cancel")
+                % (self._i, len(self._codes)))
+            return {"RUNNING_MODAL"}
+
+        return self._finish_vehicle_modal(context)
+
+    def _finish_vehicle_modal(self, context):
+        self._teardown(context)
+        p = context.scene.simutrans
+        rig.warn_if_clipped(self._frames, "vehicle")
+        record = {"obj_type": "vehicle", "frames": self._frames}
+        _LAST_RENDER[(self._out, p.basename)] = record
+        raised = rig.warnings_since(self._mark)
+        if p.write_dat:
+            sheet_png, dat_path = _build_dat(p, self._out, record)
+        else:
+            sheet_png = dat_path = None
+        return _report_render_result(self, p, self._out, self._frames,
+                                     sheet_png, dat_path, raised)
+
+    def _teardown(self, context):
+        wm = context.window_manager
+        if getattr(self, "_timer", None) is not None:
+            wm.event_timer_remove(self._timer)
+            self._timer = None
+        wm.progress_end()
+        context.workspace.status_text_set(None)
+
+
+def _report_render_result(operator, p, out, frames, sheet_png, dat_path, raised):
+    """Report a finished render into the panel: warnings, then lint, then the final
+    line. Shared by the synchronous execute() and the modal vehicle render so both
+    say exactly the same things. -> the operator return set."""
+    for message in raised:
+        say(operator, {"WARNING"}, message)
+
+    if dat_path is None:
+        say(operator, {"INFO"}, _("Rendered %d frames to %s") % (len(frames), out))
         return {"FINISHED"}
+
+    if _report_lint(operator, dat_path):
+        return {"FINISHED"}
+
+    if raised:
+        say(operator, {"WARNING"}, _("%s + %s, with %d warning(s) above")
+            % (os.path.basename(sheet_png), os.path.basename(dat_path), len(raised)))
+        return {"FINISHED"}
+
+    say(operator, {"INFO"}, "%s + %s"
+        % (os.path.basename(sheet_png), os.path.basename(dat_path)))
+    return {"FINISHED"}
 
 
 def _report_lint(operator, dat_path):
