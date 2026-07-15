@@ -794,6 +794,54 @@ def _render_one_direction(bpy, plan, code):
     return code, path
 
 
+FREIGHT_COLLECTION_PREFIX = "freight_"
+
+
+def freight_variant_count(bpy, prefix=FREIGHT_COLLECTION_PREFIX):
+    """How many freight_<i> collections exist, counted contiguously from 0.
+
+    Same additive convention as seasons and phases (collection_variant_setup): the
+    base vehicle is whatever sits OUTSIDE these collections and is always rendered;
+    freight_0, freight_1, ... each hold one cargo's load (the coal heaped in the
+    hopper, the crates on the flatbed). A gap stops the count, because the engine
+    numbers freight images 0..N-1 with no holes and would misread a skipped index.
+    """
+    n = 0
+    names = {c.name for c in bpy.data.collections}
+    while "%s%d" % (prefix, n) in names:
+        n += 1
+    return n
+
+
+def render_freight_variants(bpy, out_dir, pakset_name="pak128", dirs=8,
+                            basename="vehicle", align_offset=(0.0, 0.0, 0.0),
+                            count=None):
+    """Render the empty vehicle and one loaded sheet per freight_<i> collection.
+
+    -> (empty_frames, [variant_0_frames, variant_1_frames, ...]).
+
+    The empty render hides every freight_ collection; variant i shows only
+    freight_i. Each render is a full set of headings through render_directions, so
+    the empty and freight images automatically share the same 4-or-8 direction
+    count the engine insists on. Rendered to distinct basenames so the sheets do
+    not clobber each other before build_freight_sheet_and_dat combines them.
+    """
+    if count is None:
+        count = freight_variant_count(bpy)
+    setup = collection_variant_setup(FREIGHT_COLLECTION_PREFIX)
+
+    setup(bpy, -1)               # -1 matches no freight_<i>, so all are hidden
+    empty = render_directions(bpy, out_dir, pakset_name, dirs,
+                              "%s_empty" % basename, align_offset=align_offset)
+    variants = []
+    for i in range(count):
+        setup(bpy, i)
+        variants.append(render_directions(
+            bpy, out_dir, pakset_name, dirs, "%s_f%d" % (basename, i),
+            align_offset=align_offset))
+    return empty, variants
+
+
 def render_building(bpy, out_dir, pakset_name="pak128", basename="building",
                     size_x=1, size_y=1, layouts=None, seasons=1, season_setup=None,
                     phases=1, phase_setup=None,
@@ -1394,3 +1442,53 @@ def build_sheet_and_dat(frames, out_dir, pakset_name="pak128",
         f.write(dat_text)
 
     return sheet_png, dat_path, placement
+
+
+def build_freight_sheet_and_dat(empty_frames, freight_frames, goods, out_dir,
+                                pakset_name="pak128", basename="vehicle", cols=4,
+                                **dat_kwargs):
+    """Assemble the empty + freight sheets into one PNG and write the .dat.
+
+    empty_frames:   [(dir_code, path), ...] - the unloaded vehicle.
+    freight_frames: [[(dir_code, path), ...], ...] - one list per cargo, in the
+                    same order as `goods`.
+    goods:          the good each freight list was rendered for; becomes
+                    freightimagetype[i] and drives get_image_id at runtime.
+
+    Empty images are keyed by the plain direction string; each freight variant by
+    (index, direction), exactly the way build_way_sheet_and_dat tells its flat and
+    slope images apart in a shared sheet. One sheet keeps every cell in the same
+    PNG, so a single <basename>.row.col reference space covers them all.
+    """
+    if len(freight_frames) != len(goods):
+        raise ValueError("%d freight sheets but %d goods - they must match, one "
+                         "freightimagetype per freight image (vehicle_writer.cc)"
+                         % (len(freight_frames), len(goods)))
+    pak = paksets.get(pakset_name)
+    out_dir = _prepare_out(out_dir)
+    sheet_png = os.path.join(out_dir, "%s.png" % basename)
+
+    all_frames = list(empty_frames)
+    for i, frames in enumerate(freight_frames):
+        all_frames += [((i, d), p) for d, p in frames]
+    cells = sheet.assemble(all_frames, pak.tile_px, cols=cols, out_path=sheet_png)
+
+    warn_if_reserved_colors(bpy_module(), sheet_png, what="the vehicle sheet")
+
+    empty_place = {k: v for k, v in cells.items() if isinstance(k, str)}
+    blocks = [datgen.image_block(basename, empty_place)]
+    for i in range(len(goods)):
+        place_i = {d: v for (idx, d), v in
+                   ((k, v) for k, v in cells.items() if isinstance(k, tuple))
+                   if idx == i}
+        blocks.append(datgen.image_block(basename, place_i, freight=True,
+                                         freight_index=i))
+
+    dat_text = datgen.vehicle_dat(dat_kwargs.pop("name", basename),
+                                  "\n".join(blocks), freight_types=goods,
+                                  **dat_kwargs)
+    dat_path = os.path.join(out_dir, "%s.dat" % basename)
+    with open(dat_path, "w", encoding="utf-8") as f:
+        f.write(dat_text)
+
+    return sheet_png, dat_path, empty_place
