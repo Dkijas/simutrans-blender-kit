@@ -505,6 +505,39 @@ def test_bridge_dat():
           "it would ship an unbuildable bridge in silence")
 
 
+def test_factory_dat():
+    """A factory is a building plus its economics, in one obj=factory block.
+
+    Verified against makeobj: it packs factory.BKit_Mine, and WITHOUT mapcolor it
+    fatals ('missing an identification color'), so the mandatory colour really is
+    mandatory (factory_writer.cc:171). The images are the ordinary building block.
+    """
+    from core import factories, buildings, schema
+
+    out = factories.output_block([("Kohle", 40, 100), ("Koks", 20, 50)])
+    check("outputs are numbered goods with capacity and factor",
+          out.splitlines()[:3] == ["outputgood[0]=Kohle",
+                                    "outputcapacity[0]=40",
+                                    "outputfactor[0]=100"], out)
+    inp = factories.input_block([("Eisenerz", 2, 30, 100)])
+    check("inputs name the good and its supplier count",
+          "inputgood[0]=Eisenerz" in inp and "inputsupplier[0]=2" in inp, inp)
+
+    place = {(0, 0, 0, 0, 0, 0): (0, 0)}
+    block = buildings.image_block("fac", place)
+    dat = factories.factory_dat("BKit_Mine", block, mapcolor=42, dims="1,1",
+                                location="Land", productivity=20,
+                                outputs=[("Kohle", 40, 100)])
+    check("dat is a factory", "obj=factory" in dat)
+    check("dat carries the mandatory mapcolor", "\nmapcolor=42\n" in dat, dat)
+    check("dat produces its good",
+          "outputgood[0]=Kohle" in dat and "outputcapacity[0]=40" in dat, dat)
+    check("dat carries the building images (it embeds a building)",
+          "BackImage[0][0][0][0][0]=fac.0.0" in dat, dat)
+    check("the factory .dat lints clean", not schema.lint(dat),
+          "; ".join(str(f) for f in schema.lint(dat)))
+
+
 def test_dat_has_no_end_of_line_comments():
     """A .dat has NO trailing comments - and the engine dies if you write one.
 
