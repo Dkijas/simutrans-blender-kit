@@ -428,13 +428,18 @@ it will move. If it says false, the catenary is decoration.
 
 ```
 python tools/lint_dat.py myvehicle.dat
-python tools/lint_dat.py pak128/vehicles/
+python tools/lint_dat.py pak128/vehicles/       # recurses
+python tools/lint_dat.py --json vehicles/       # machine-readable, for CI/editors
 ```
+
+Every finding carries a stable code (`no-icon`, `dup-key`, `bad-int`, …), and a
+line `# bkit: ignore=no-icon, dup-key` anywhere in a `.dat` silences those codes
+for that file — the escape valve for a finding you have read and accept.
 
 There is no schema document for `.dat` files; the authority is the C++ that reads
 them. So we don't hand-maintain a key list — `tools/extract_dat_schema.py` reads
 `src/simutrans/descriptor/writer/*.cc` and pulls out **22 top-level `obj=` types
-and 432 keys**, including the image keys that are built at runtime
+and 636 keys**, including the image keys that are built at runtime
 (`sprintf(buf, "emptyimage[%s]", dir)`). A test re-extracts and **fails if our copy
 has drifted from the engine**, because a stale linter is worse than none: it calls
 brand-new valid keys "unknown".
@@ -455,8 +460,13 @@ It also catches typos, and — because it knows every type's keys — tells you 
 key is real but on the wrong object: *"obj=vehicle does not read 'climates' — it
 belongs to obj=building"*.
 
-Zero findings on pak128's own shipped `.dat` files, which is the bar: a linter that
-cries wolf on working art is worthless.
+On pak128's own shipped `.dat` files it reports **77 findings and zero false
+positives** — and that is the bar, because a linter that cries wolf on working art
+is the one people turn off. The 77 are real: 49 duplicate keys (a repeated key is
+silently dropped by the engine, so the second line is dead), 25 keys the engine
+does not read, and 3 unknown `obj=` types. Every one is a thing the pakset gets
+away with, not a thing the linter invented. (An earlier version of this README
+claimed "zero findings", which was wrong; the achievement is zero *false* ones.)
 
 ## Running the tests
 
@@ -473,7 +483,10 @@ cmake --build build/sim-headless --target simutrans
 ```
 
 `SIMUTRANS_BACKEND=none` compiles to `COLOUR_DEPTH=0` and a null renderer — no
-window, no SDL. The whole suite, engine included, runs in about **13 seconds**.
+window, no SDL. The whole suite renders every object through Blender, compiles the
+`.pak` files the game suites load, and runs the headless engine on each — a few
+minutes end to end. The fast inner loop is `python tools/run_tests.py core`, which
+is the Blender-free half and takes under a second.
 
 ### The runner refuses to lie
 
