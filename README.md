@@ -5,8 +5,30 @@
 [![Latest release](https://img.shields.io/github/v/release/Dkijas/simutrans-blender-kit)](https://github.com/Dkijas/simutrans-blender-kit/releases/latest)
 
 A modern **Blender 4.x/5.x** add-on that takes a 3D model and produces everything
-Simutrans needs: the 8 directional sprites, the sprite sheet, and a compilable
-`.dat` — with the reserved colours preserved byte-for-byte.
+Simutrans needs: the directional sprites, the sprite sheet, and a compilable
+`.dat` — with the reserved colours preserved byte-for-byte. With makeobj configured,
+it goes all the way to an installed `.pak` without leaving Blender.
+
+## What it makes
+
+The panel builds **eight object types**, each grounded in the engine's own writer
+and verified in a running game:
+
+| Object | What it emits |
+|---|---|
+| **Vehicle** | 4 or 8 directional sprites, plus **cargo (freight) variants** — a different sprite empty vs. loaded with a good |
+| **Building** | footprint × height × layout × phase × season, and **stations, depots and extensions** |
+| **Way** | the 16 ribi combinations from 6 models, plus slope images |
+| **Catenary** (way object) | overhead line in two layers (`backimage`/`frontimage`), plus slopes |
+| **Sign / Signal** | four directions, signal states (state 0 = red) |
+| **Tunnel** | a portal, four directions, two layers |
+| **Bridge** | span, ramps and pillars, two layers, with length/height limits |
+| **Factory** | a building plus its economics — the goods it makes or consumes |
+
+Around them: a **`.dat` linter**, **reserved-colour** preservation, **pakset
+profiles** measured from the real pakset, **makeobj** compilation and `.pak`
+install, an **English/Spanish** panel, and an automated suite that renders,
+compiles and loads every one through Blender, makeobj and a headless Simutrans.
 
 ## Why
 
@@ -112,23 +134,42 @@ __init__.py      the add-on entry point (bl_info, register)
 core/            pure Python, stdlib only — runs inside Blender or standalone
   projection.py    the exact camera geometry, and the alignment (+ derivations)
   directions.py    the engine's direction codes and fallback rules
-  paksets.py       pak64/128/192/256 profiles
+  paksets.py       pak64/128/192/256 profiles, measured from the real pakset
   colors.py        reserved colours + a validator for accidental hits
+  night.py         the three night-light paths, per colour class
   sheet.py         PNG read/write (zlib only; reads palettes) + sheet assembly
-  datgen.py        emits EmptyImage[...] refs and a full vehicle .dat
+  datgen.py        vehicle .dat, incl. freight (cargo) variants
+  buildings.py     footprint/height/layout/phase/season + stations & depots
+  ways.py          the six models → sixteen ribi images, and slopes
+  roadsigns.py     sign/signal directions and states
+  tunnels.py       portal images, four directions, two layers
+  bridges.py       span / start / ramp / pillar image groups
+  factories.py     a building plus its economics (goods in/out, mapcolor)
+  convoy.py        car length in tiles, for coupled units
+  schema.py        the .dat linter (keys read from the engine's writers)
 addon/
-  rig.py           Blender: build rig, render N directions, sheet + .dat
+  rig.py           Blender: build rig, render N directions/pieces, sheet + .dat
   ui.py            the Simutrans sidebar tab
   translations.py  the panel's strings, per language (plain data, no bpy)
 examples/
   demo_loco.py     a real, installable vehicle from a Blender model
+  demo_house.py    a building the game plants on the map
+  demo_all.py      one of every object type
+  civia.py         a five-car pak128 unit (Civia S/465)
+  cercanias.py     a commuter set
 tools/
   build_addon_zip.py
+  lint_dat.py          the linter, standalone
+  measure_pakset.py    reads a real pakset's tile_height / height factor
+  extract_dat_schema.py  re-derives the linter's key list from the engine
+  run_tests.py         renders, compiles and runs the whole suite
 tests/
-  test_core.py         970 checks, no Blender needed
+  test_core.py         1,145 checks, no Blender needed
+  test_pakset_profile.py  profiles vs. the real pakset's simuconf.tab
   blender_e2e.py       full pipeline inside Blender (model → sheet → .dat)
   blender_alignment.py the tile quad lands at 3/4; opposite headings match
   blender_addon.py     installs the zip and drives the panel's own buttons
+  blender_{building,way,freight,tunnel,bridge,infra,panel,footprint}.py
 ```
 
 ## Buildings
@@ -305,6 +346,17 @@ expect frame 0 to be the one on screen.
 Buildings are now complete: **footprint × height × layout × phase × season**, all
 keyed the way the engine indexes them, `BackImage[l][y][x][h][phase][season]`.
 
+### Stations, depots and extensions
+
+A stop, a depot or an extension is a building with a `type` (`building_writer.cc`
+reads it from the `type=` key), a `waytype`, and — because the player places it —
+an **icon**. That last part is not optional: `builder/hausbauer.cc` gives a
+player-built building with no cursor image a `NULL` builder, exactly like the way
+and the tunnel, so a station without an icon loads perfectly and **cannot be
+built**. The kit emits the icon for these types and lets you pick the kind and the
+goods it accepts (passengers, mail, freight). Verified: the generated stop turns up
+in the engine's own station-builder list.
+
 ## Ways — six models, sixteen images
 
 A way is not one sprite. The engine picks a different image depending on which
@@ -431,6 +483,32 @@ Verified in a running game (`bkitinfra`): lay a rail, hang the wire, then ask th
 way itself `is_electrified()` — the very call an electric locomotive makes before
 it will move. If it says false, the catenary is decoration.
 
+## Tunnels, bridges and factories
+
+Three more object types, each modelled the way its engine writer reads it and each
+checked buildable (or loadable) in a running game.
+
+* **Tunnels** are a portal in four directions and two layers — a back part behind
+  the vehicle and a front part over it — plus the mandatory build icon (same rule
+  as the way and the station: no icon, no builder). Model the portal once, and the
+  rig turns it.
+* **Bridges** carry the four image groups the engine reads — `image` (the span),
+  `start`, `ramp` and `pillar`, each with an optional double-height `…2` set
+  (`bridge_writer.cc`) — plus the length, height and pillar-distance limits. Model
+  `bridge_span`, `bridge_start`, `bridge_ramp`, `bridge_pillar` and it assembles
+  them.
+* **Factories** are a building *plus* its economics in one `obj=factory`: the goods
+  it makes or consumes (each a cross-reference that must resolve when the game
+  loads — makeobj compiles it unresolved), the productivity, and a **minimap
+  colour**, which is not optional — `factory_writer.cc` calls `dbg->fatal(...)`
+  without it. The sprites are the ordinary building render; the factory node simply
+  wraps the building node the writer already knows how to emit.
+
+One caveat kept honestly: the exact **portal/piece-on-which-hill** mapping for
+tunnels and bridges is derived from the engine's slope tables. The pieces are
+verified buildable; which one lands on which slope is the reflection you confirm by
+eye in a windowed game, not from a headless run.
+
 ## The .dat linter (no Blender needed)
 
 ```
@@ -445,7 +523,7 @@ for that file — the escape valve for a finding you have read and accept.
 
 There is no schema document for `.dat` files; the authority is the C++ that reads
 them. So we don't hand-maintain a key list — `tools/extract_dat_schema.py` reads
-`src/simutrans/descriptor/writer/*.cc` and pulls out **22 top-level `obj=` types
+`src/simutrans/descriptor/writer/*.cc` and pulls out **34 top-level `obj=` types
 and 636 keys**, including the image keys that are built at runtime
 (`sprintf(buf, "emptyimage[%s]", dir)`). A test re-extracts and **fails if our copy
 has drifted from the engine**, because a stale linter is worse than none: it calls
@@ -517,8 +595,12 @@ All three go red.
 
 ## Status
 
-* `core` — **970 checks pass** (`python tests/test_core.py`).
-* Blender pipeline — **end-to-end green on Blender 5.1.2**
+The full suite is **35 suites, all green** (`python tools/run_tests.py`), from the
+Blender-free core checks through the Blender renders to the headless game, including
+scenarios on a real **pak128**.
+
+* `core` — **1,145 checks pass** (`python tests/test_core.py`).
+* Blender pipeline — **end-to-end green on Blender 5.1**
   (`blender --background --python tests/blender_e2e.py` → `E2E_OK`):
   renders 8 × 128×128 RGBA, assembles a 4×2 sheet, writes a compilable `.dat`,
   and the validator confirms the player-colour stripe survived the render
@@ -526,7 +608,14 @@ All three go red.
 * Alignment and lighting — `blender_alignment.py` → `ALIGN_OK`.
 * The add-on — `blender_addon.py` → `ADDON_OK`: builds the zip, installs it into
   Blender, enables it, and drives the panel's own buttons.
-* **The loop is closed** — the output is a vehicle the game buys and drives.
+* Every object type — vehicle (with freight variants), building, station/depot,
+  way, catenary, signal, tunnel, bridge and factory — is rendered, compiled and
+  then **loaded or built in the headless game**, each with its own scenario.
+* `profile` — the pakset profiles are checked against the real pakset's own
+  `config/simuconf.tab`, and skip cleanly when no pakset is mounted.
+* **The loop is closed** — the output is a vehicle the game buys and drives, and
+  two real multi-car pak128 units (a Civia S/465 and a Madrid Metro 9000) assemble
+  and run under pak128 catenary.
 
 ### Closing the loop: model → `.pak` → in the depot
 
@@ -628,8 +717,20 @@ camera is at azimuth 135.
 
 ### Not yet done
 
-Freight and livery variants (`FreightImage[n][dir]` — `core/datgen.py` already
-emits the keys, nothing drives them yet), multi-tile vehicles, and buildings.
+Buildings, freight (cargo) variants, ways, catenary, signals, tunnels, bridges,
+stations/depots and factories have all landed since this section first listed them
+as pending. What is still open:
+
+* **Vehicles that occupy more than one tile.** A single vehicle longer than one
+  tile is not supported. Convoys of several one-tile cars *are* — the two example
+  units are built that way.
+* **Livery variants** are a Simutrans *Extended* feature, not base Simutrans, so
+  they are out of scope here; freight (cargo) variants are the base-game equivalent
+  and are implemented.
+* **pak192 and pak256 profiles** carry the engine defaults — those paksets are not
+  mounted here to measure. The `profile` test will measure them the day they are.
+* **Per-slope orientation** of tunnels and bridges is derived, not yet eye-checked
+  in a windowed game (see above).
 
 ## License
 
