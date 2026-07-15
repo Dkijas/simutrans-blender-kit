@@ -445,6 +445,10 @@ def _render(p, out):
             slope2_frames = rig.render_way_slopes(
                 bpy, out, p.pakset, basename=p.basename, double=True,
                 align_offset=tuple(p.align_offset))
+        # On a pakset whose hills are double by default (pak128), a way with a
+        # single ramp but no way_slope2 gets its single image stretched over every
+        # ordinary hill. Say so - the panel is where the artist will see it.
+        rig.warn_if_double_slope_missing(bpy, p.pakset)
         record = {"obj_type": "way", "frames": frames,
                   "slope_frames": slope_frames, "slope2_frames": slope2_frames}
 

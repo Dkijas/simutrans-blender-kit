@@ -346,6 +346,26 @@ def main():
     check("...and an icon, without which nobody could build it",
           dat and "icon=" in dat, dat)
 
+    # --- a way on pak128 with a single ramp but no way_slope2.
+    #
+    # pak128's hills are double-height by default (height_conversion_factor 2), so
+    # the engine stretches the single-height slope image over every ordinary hill
+    # (way_desc.h:176). The panel has to say so - the console is not the artist's
+    # screen. This is the double of the clipping test below: fire when it should.
+    ramp = new_collection("way_slope")
+    cube(z=0.15, sx=1.2, sy=0.3, sz=0.02, collection=ramp)   # a straight on a ramp
+    p.pakset = "pak128"                                       # the default, made explicit
+    _r, reported = press_and_catch(p, "pslope1")
+    check("a pak128 way with no way_slope2 is warned ON THE PANEL",
+          any("way_slope2" in message for _lvl, message in reported), str(reported))
+
+    # model the double ramp too, and the advice must go away - do not cry wolf.
+    ramp2 = new_collection("way_slope2")
+    cube(z=0.30, sx=1.2, sy=0.3, sz=0.02, collection=ramp2)
+    _r, quiet = press_and_catch(p, "pslope2")
+    check("...and once way_slope2 exists the panel is quiet about it",
+          not any("way_slope2" in message for _lvl, message in quiet), str(quiet))
+
     # --- wayobj, back and front
     clear()
     for piece, base in ways.PIECES:

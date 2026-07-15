@@ -1077,6 +1077,22 @@ def has_slope_model(bpy, double=False, prefix=WAY_COLLECTION_PREFIX):
     return any(col.name == wanted for col in bpy.data.collections)
 
 
+def warn_if_double_slope_missing(bpy, pakset_name, prefix=WAY_COLLECTION_PREFIX):
+    """On a double-slope pakset (pak128), nudge for way_slope2. -> the text, or None.
+
+    The decision is core/ways.double_slope_advisory - pure, and tested without
+    Blender. This only supplies the two facts it needs from the scene and the
+    pakset, and puts the result where the panel will show it.
+    """
+    text = ways.double_slope_advisory(
+        paksets.get(pakset_name).double_slope_default,
+        has_slope_model(bpy, prefix=prefix),
+        has_slope_model(bpy, double=True, prefix=prefix))
+    if text:
+        _warn("way slopes: " + text)
+    return text
+
+
 def render_way_slopes(bpy, out_dir, pakset_name="pak128", basename="way",
                       double=False, piece_setup=None, distance=20.0,
                       align_offset=(0.0, 0.0, 0.0)):

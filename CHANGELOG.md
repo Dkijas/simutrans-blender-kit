@@ -28,8 +28,16 @@ Pakset profiles measured against the real pakset, not transcribed and hoped.
   the `way_slope2` model) the common case for pak128, not the optional decoration
   it is for a factor-1 pakset. The profile exposes `double_slope_default` and the
   double ramp's rise (`double_slope_rise_px` / `_world`, exactly two single levels)
-  for the artist. No artist-visible output changed; this is reference data made
-  trustworthy.
+  for the artist.
+
+- **The panel warns when a pak128 way has no `way_slope2` model.** The measured
+  fact above, put in front of the artist: render a way for a double-slope pakset
+  with a single ramp but no double one, and the panel now says the single-height
+  image will be stretched over every ordinary hill, and to model `way_slope2`. It
+  stays silent for a single-height pakset (the demo pak), where the double slope is
+  genuinely rare, and once the double ramp is modelled. The decision is pure and
+  tested without Blender (`ways.double_slope_advisory`); a panel test proves the
+  warning reaches the artist's screen, not just the console.
 
 ## 0.6.0
 

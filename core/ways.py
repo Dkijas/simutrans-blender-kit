@@ -220,6 +220,30 @@ SLOPE_TURNS = {"n": 0, "e": 1, "s": 2, "w": 3}
 DOUBLE_SLOPE_OPTIONAL = True
 
 
+def double_slope_advisory(double_slope_default, has_single_slope, has_double_slope):
+    """The warning a way needs about its missing double slope - or None.
+
+    way_desc.h:176 reuses the single-height slope image for a double slope when the
+    double one (imageup2, the way_slope2 model) is absent: "a hack for old ways
+    without double height images". For a single-height pakset that is fine - the
+    double slope is a rare, hand-terraformed thing. But a pakset with
+    height_conversion_factor 2 (pak128, see core/paksets) makes the double slope
+    the ORDINARY hill, so a way that omits way_slope2 has its single-height image
+    stretched over every normal slope in the game.
+
+    So the advice is only worth giving when all three are true: the pakset is
+    double-by-default, the way IS drawn on slopes at all (it has the single image -
+    a way with no slope image is a different, louder problem the render handles),
+    and the double image is the one it lacks.
+    """
+    if double_slope_default and has_single_slope and not has_double_slope:
+        return ("this pakset's hills are double-height by default, but the way has "
+                "no way_slope2 model - the engine will stretch the single-height "
+                "slope image over every ordinary hill (way_desc.h:176). Model "
+                "way_slope2 for a ramp that climbs the double slope instead.")
+    return None
+
+
 # The seventh and eighth shapes, in the same grammar as the other six: a straight
 # way sitting on a ramp that faces NORTH. Everything else is that model turned.
 SLOPE_PIECE = "slope"

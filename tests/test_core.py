@@ -772,6 +772,35 @@ def test_ways_orbit_decomposition():
           ways.missing(ways.PIECE_NAMES) == [])
 
 
+def test_double_slope_advisory():
+    """A double-slope pakset (pak128) needs way_slope2; a single-slope one does not.
+
+    way_desc.h:176 lets a way reuse its single-height slope image for a double
+    slope. For pak128 the double slope is the ordinary hill (height_conversion_
+    factor 2), so omitting way_slope2 stretches the single image over every normal
+    slope - worth a warning. The decision is pure; this pins exactly when it fires.
+    """
+    from core import ways
+
+    # pak128: has the single ramp but not the double -> advise.
+    text = ways.double_slope_advisory(True, has_single_slope=True,
+                                      has_double_slope=False)
+    check("pak128 with no way_slope2 is warned", text is not None)
+    check("...and the message names the model to add", "way_slope2" in text)
+
+    # once the double ramp is modelled, nothing to say.
+    check("pak128 with way_slope2 is silent",
+          ways.double_slope_advisory(True, True, True) is None)
+
+    # a single-height pakset (factor 1) never needs the double image.
+    check("the demo pakset is not warned even without way_slope2",
+          ways.double_slope_advisory(False, True, False) is None)
+
+    # a way with NO slope image at all is a different, louder problem - not this one.
+    check("a way with no ramp at all is left to the invisible-on-slopes path",
+          ways.double_slope_advisory(True, False, False) is None)
+
+
 def test_roadsign_index_order():
     """dir + state*4, with dir 0=n 1=s 2=w 3=e - and state 0 is RED.
 
