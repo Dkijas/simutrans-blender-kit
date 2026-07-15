@@ -133,14 +133,28 @@ _GROUP = re.compile(r"\[([^\]]*)\]")
 
 
 def _values_of(content):
-    """The concrete texts one bracket group stands for."""
+    """The concrete texts one bracket group stands for.
+
+    Malformed input must not crash the linter. `image[0-]` is a real thing a person
+    types by accident, and its range half `0-` has no upper bound: int("") threw
+    ValueError and took down the whole pakset scan with it. A group we cannot parse
+    is returned UNEXPANDED - as the single literal it is - so the scan survives.
+
+    (The literal `image[0-]` then flows on and, because it starts with `image[`, is
+    accepted as an image-reference pattern rather than reported. Catching a
+    malformed image index is a separate rule this does not add; the point here is
+    only that one bad line no longer kills the lint of every file after it.)
+    """
     if content[:1].isdigit():
         # numeric: '0-3' is a range, '0,2,5' is a list, and both can be mixed
         out = []
         for token in content.split(","):
             if "-" in token[1:]:
                 a, b = token.split("-", 1)
-                out.extend(str(v) for v in range(int(a), int(b) + 1))
+                try:
+                    out.extend(str(v) for v in range(int(a), int(b) + 1))
+                except ValueError:
+                    return [content]        # e.g. '0-': not a range, leave it whole
             else:
                 out.append(token)
         return out
@@ -240,10 +254,16 @@ WAYTYPES = ("none", "road", "track", "electrified_track", "maglev_track",
 WAYTYPE_KEYS = ("waytype", "own_waytype")
 
 
-def _icon_findings(seen_icon):
-    """{obj_type: (line of the obj= key, saw an icon?)} -> [Finding]."""
+def _icon_findings(icon_blocks):
+    """[[obj_type, line of the obj= key, saw an icon?], ...] -> [Finding].
+
+    ONE ENTRY PER OBJECT, not per type. This was keyed by obj_type, so two
+    obj=way in one file shared a slot: give the first an icon and the second, with
+    none, inherited it and its missing-icon error vanished. A .dat routinely holds
+    several ways, and the second unbuildable one is exactly the one you would miss.
+    """
     out = []
-    for obj_type, (line, has_icon) in sorted(seen_icon.items(), key=lambda kv: kv[1][0]):
+    for obj_type, line, has_icon in icon_blocks:
         if obj_type in NEEDS_ICON and not has_icon:
             out.append(Finding("error", line,
                                "obj=%s with no icon=. The engine only builds a tool "
@@ -406,7 +426,7 @@ def lint(text):
     out = []
     obj_type = None
     seasons = {}          # {first line of the group: how many season images}
-    icons = {}            # {obj type: [line of its obj= key, saw an icon?]}
+    icon_blocks = []      # one [obj_type, obj= line, saw an icon?] PER OBJECT
     unknown_types = {}    # {bad obj= value: [first line, how many]}
     seen = {}             # {key: (line, value)} for THIS object - see below
 
@@ -453,7 +473,7 @@ def lint(text):
                                    "something a .dat may declare" % obj_type))
                 obj_type = None
             else:
-                icons.setdefault(obj_type, [n, False])
+                icon_blocks.append([obj_type, n, False])
             continue
 
         if obj_type is None:
@@ -489,8 +509,8 @@ def lint(text):
         for k in expand_key(key):
             seen[k] = (n, value.strip())
 
-        if key == "icon" and value.strip():
-            icons[obj_type][1] = True
+        if key == "icon" and value.strip() and icon_blocks:
+            icon_blocks[-1][2] = True          # THIS object saw its icon
 
         if key in WAYTYPE_KEYS:
             got = value.strip().lower()
@@ -533,6 +553,6 @@ def lint(text):
                            % (bad, more, bad, ", ".join(TOP_LEVEL))))
 
     out.extend(_season_findings(seasons))
-    out.extend(_icon_findings({t: tuple(v) for t, v in icons.items()}))
+    out.extend(_icon_findings(icon_blocks))
     out.sort(key=lambda f: f.line)
     return out

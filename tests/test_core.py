@@ -727,6 +727,51 @@ def test_no_icon_no_object():
     check("and is happy once the icon is there",
           not any("icon" in f.message for f in ok), str(ok))
 
+    # PER OBJECT, not per type. Two ways in one file, the first with an icon and the
+    # second without: the second is unbuildable and used to be masked, because the
+    # icon flag was keyed by obj type and the two shared it.
+    two = ("obj=way\nname=Has_Icon\nwaytype=road\nimage[-]=a.0.0\nicon=a.0.1\n"
+           "obj=way\nname=No_Icon\nwaytype=road\nimage[-]=b.0.0\n")
+    findings = schema.lint(two)
+    icon_errors = [f for f in findings if f.level == "error" and "icon" in f.message]
+    check("a second icon-less way of the same type is still caught",
+          len(icon_errors) == 1, "%d icon errors: %s" % (len(icon_errors), findings))
+    check("...and it points at the SECOND object, not the first",
+          icon_errors and "No_Icon" not in two[:two.rindex("obj=way")]
+          and icon_errors[0].line > two[:two.rindex("obj=way")].count("\n"),
+          str(icon_errors))
+
+
+def test_linter_survives_malformed_input():
+    """A broken key must not take down the scan of a whole pakset.
+
+    image[0-] - a range with no upper bound - fed int('') to range() and raised
+    ValueError, killing the lint of every file after it. A group the expander
+    cannot parse is now left as the literal it is, so the scan survives. (Whether
+    that literal is then reported is a separate rule; here we only prove no crash.)
+    """
+    from core import schema
+
+    dat = "obj=way\nname=Broken\nwaytype=road\nimage[-]=x.0.0\nimage[0-]=x.0.1\n"
+    try:
+        schema.lint(dat)
+        crashed = False
+    except Exception as e:               # noqa: BLE001 - the point is "any exception"
+        crashed = repr(e)
+    check("a malformed range does not crash the linter", crashed is False, crashed)
+
+    # a genuine unknown key is still reported - the malformed one is not a regression
+    # in that rule, it is simply accepted as an image pattern
+    findings = schema.lint("obj=way\nname=X\nwaytype=road\nimage[-]=x.0.0\n"
+                           "icon=x.0.1\nnosuchkey=9\n")
+    check("an unknown key is still flagged",
+          any("nosuchkey" in f.message for f in findings), str(findings))
+
+    # the expander itself, directly
+    check("expand_key leaves an unparseable range whole",
+          schema.expand_key("image[0-]") == ["image[0-]"],
+          str(schema.expand_key("image[0-]")))
+
 
 def test_building_image_block():
     from core import buildings, schema
