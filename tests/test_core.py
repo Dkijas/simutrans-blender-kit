@@ -11,7 +11,7 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core import (colors, convoy, datgen, directions, night, paksets, projection,
-                  schema, sheet)
+                  schema, sheet, tunnels)
 from tools import spec      # NOT core: it is not shipped. See tools/spec.py.
 
 _passed = 0
@@ -389,6 +389,63 @@ def test_a_vehicle_without_freight_is_byte_identical():
     check("no freightimagetype line leaks in", "freightimagetype" not in without)
     check("no blank-line churn around payload",
           "\npayload=0\n\n# --- coupling" in without, without)
+
+
+def test_tunnel_portal_dat():
+    """A narrow tunnel: four portal directions, two layers, a mandatory icon.
+
+    Verified against makeobj, which packs it (exit 0). The direction order is the
+    writer's own n, s, e, w (tunnel_writer.cc indices[]), NOT the way module's
+    n, w, e, s - a portal keyed in the wrong order lands on the wrong hill.
+    """
+    back = {"n": (0, 0), "s": (0, 1), "e": (0, 2), "w": (0, 3)}
+    front = {"n": (1, 0), "s": (1, 1), "e": (1, 2), "w": (1, 3)}
+
+    block = tunnels.image_block("tun", back, front)
+    check("back then front, each in n/s/e/w order",
+          block.splitlines() == [
+              "backimage[n]=tun.0.0", "backimage[s]=tun.0.1",
+              "backimage[e]=tun.0.2", "backimage[w]=tun.0.3",
+              "frontimage[n]=tun.1.0", "frontimage[s]=tun.1.1",
+              "frontimage[e]=tun.1.2", "frontimage[w]=tun.1.3"], block)
+
+    only_back = tunnels.image_block("tun", back)
+    check("front is optional", "frontimage" not in only_back and
+          only_back.count("backimage") == 4, only_back)
+
+    # all-four-or-none, both layers - a partial set draws the wrong portal
+    try:
+        tunnels.image_block("tun", {"n": (0, 0), "s": (0, 1), "e": (0, 2)})
+        check("partial back is refused", False, "no error raised")
+    except ValueError as e:
+        check("partial back is refused", "missing w" in str(e), str(e))
+    try:
+        tunnels.image_block("tun", back, {"n": (1, 0)})
+        check("partial front is refused", False, "no error raised")
+    except ValueError as e:
+        check("partial front is refused", "all four or none" in str(e), str(e))
+
+    ui = tunnels.icon_block("tun", back, icon_dir="s")
+    dat = tunnels.tunnel_dat("BKit_Tunnel", block, ui, waytype="track",
+                             topspeed=120, cost=50000, maintenance=500)
+    check("dat is a tunnel", "obj=tunnel" in dat)
+    check("dat carries an icon, or it cannot be built", "\nicon=tun." in dat, dat)
+    check("dat carries all four back portals",
+          all(("backimage[%s]=" % d) in dat for d in "nsew"), dat)
+    check("dat carries all four front portals",
+          all(("frontimage[%s]=" % d) in dat for d in "nsew"), dat)
+
+    findings = schema.lint(dat)
+    check("the tunnel .dat lints clean", not findings,
+          "; ".join(str(f) for f in findings))
+
+    # the linter must catch a tunnel with no icon - the silent unbuildable trap
+    without_icon = "\n".join(l for l in dat.splitlines()
+                             if not l.startswith("icon="))
+    check("the linter catches a tunnel with no icon",
+          any(f.level == "error" and "icon" in f.message
+              for f in schema.lint(without_icon)),
+          "it would ship an unbuildable tunnel in silence")
 
 
 def test_dat_has_no_end_of_line_comments():
