@@ -112,8 +112,21 @@ payload={payload}
 # the convoy. Write both `none`s and the vehicle can only ever run ALONE, which
 # is right for a lone shunter and wrong for every carriage ever built.
 #
-# So: no constraints unless asked for. Pass a list of vehicle names to restrict,
-# using "none" for "may be at the end" and "any" for "anything at all".
+# So: no constraints unless asked for. Pass a list of vehicle names to restrict.
+#
+# The two keywords, exactly (docs/constraints-in-simutrans.md has the full table):
+#
+#   "none"  Prev -> ONLY at the head.  Next -> ONLY at the tail.  Both -> alone.
+#   "any"   Prev -> NEVER at the head. Next -> NEVER at the tail. Both -> middle only.
+#
+# "any" used to be described here as "anything at all". That is half true and it
+# misses the half that matters: it FORBIDS the end. pakset_manager.cc:238 says so
+# outright - "vehicle to follow to mark something cannot lead a convoi (prev[0]=any)
+# or cannot end a convoi (next[0]=any)" - because any_vehicle is a real sentinel
+# object and can_follow only matches it when prev_veh is NOT NULL. An artist told
+# "any means anything" would reach for it for a carriage that may go anywhere, and
+# would ship a carriage the game refuses to put at the front of a train, with
+# nothing warning. core/consists.py generates these; it does not hand them to you.
 def _coupling_block(prev, next_) -> str:
     lines = []
     for side, names in (("Prev", prev), ("Next", next_)):
