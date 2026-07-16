@@ -161,6 +161,9 @@ __init__.py      the add-on entry point (bl_info, register)
 core/            pure Python, stdlib only — runs inside Blender or standalone
   templates.py     what each object needs, and the guides — the inverse of the readers
   scenecheck.py    is this scene worth rendering? ERROR / WARNING / INFORMATION
+  variants.py      one scene, many sibling objects. The axes the engine really has
+  package.py       gather, check and zip a release. Reproducible; uploads nothing
+  components.py    the reusable-part catalogue, and its licence rules
   projection.py    the exact camera geometry, and the alignment (+ derivations)
   directions.py    the engine's direction codes and fallback rules
   paksets.py       pak64/128/192/256 profiles, measured from the real pakset
@@ -179,6 +182,8 @@ core/            pure Python, stdlib only — runs inside Blender or standalone
 addon/
   rig.py           Blender: build rig, render N directions/pieces, sheet + .dat
   template.py      Blender: make the collections and guides; describe a scene
+  workflow.py      Blender: apply a variant; the preview (= the final render)
+  library.py       Blender: pull a component out of its .blend
   ui.py            the Simutrans sidebar tab
   translations.py  the panel's strings, per language (plain data, no bpy)
 examples/
@@ -626,13 +631,53 @@ were checked adversarially: a scenario that does not exist, a scenario whose
 script throws, and a scenario that runs perfectly but never prints its sentinel.
 All three go red.
 
+## Variants, components and publishing
+
+A vehicle's whole variant vocabulary, according to the engine, is
+`freightimage[%d][%s]`. **There are no liveries in base Simutrans** — the string
+`livery` does not occur in the source outside the word *delivery*; they are a
+Simutrans *Extended* feature. **There is no day/night variant** — the engine does
+that itself, from the reserved colours in the sprite you already rendered. So a
+green loco and a red loco are **two objects**, and the panel says so.
+
+That is what the **Variant Manager** models: one scene, N sibling objects, each a
+set of *overrides*, none of them a copy of your geometry. Ask it for a seasonal
+catenary and it refuses with the reason, because `way-object`'s image key is
+`backimage[ribi]` and stops. [The whole derivation, per
+writer](docs/variants-in-simutrans.md).
+
+**Preview** is not a second renderer, and that is a claim worth checking rather
+than trusting. `render_directions` is `prepare_directions()` plus a loop of
+`render_one_step()`; the preview calls those same two functions for one heading.
+`tests/blender_phase2.py` renders both and demands the PNGs come out
+**byte-identical** — so a preview that drifted from the final render would require
+`render_directions` to differ from itself.
+
+**Publish** gathers the `.dat`, the sprites, the licence and a manifest into one
+reproducible zip — fixed timestamps and sorted entries, so the same inputs give
+the same archive and the `sha256` in the manifest means something. Every file is
+marked *generated* or *authored*, because a maintainer needs to know which is
+output and which is your work. No licence, no package. **Nothing is uploaded,
+ever.**
+
+The **Component Library** has one hard rule: **no licence, no insert**. A library
+copies people's work into people's projects — that is the point of it, and it is
+why an unlicensed component in somebody's pakset, with no answer to "may we ship
+this?", is a thing the kit will not cause. We ship no third-party art.
+
 ## Status
 
-The full suite is **38 suites, all green** (`python tools/run_tests.py`), from the
+The full suite is **42 suites, all green** (`python tools/run_tests.py`), from the
 Blender-free core checks through the Blender renders to the headless game, including
 scenarios on a real **pak128**.
 
-* `core` — **1,240 checks pass** (`python tests/test_core.py`).
+* `core` — **1,417 checks pass** (`python tests/test_core.py`).
+* `variants`, `package`, `components` — **232 checks**, no Blender. Every rule is
+  checked twice: on a case that trips it and one that must not.
+* `phase2` — inside Blender: the preview is byte-identical to the final render, a
+  variant repaints without duplicating a mesh, an unlicensed component is refused
+  with nothing added to the scene, and template → variants → two `.dat` → a
+  validated zip, end to end.
 * `templates` and `scenecheck` — **159 checks**, no Blender. The template is
   checked against `addon.rig` and `core.ways` rather than against a list written in
   the test, because a third copy of a name is a third thing to drift. Every

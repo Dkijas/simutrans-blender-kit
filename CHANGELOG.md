@@ -1,5 +1,81 @@
 # Changelog
 
+## 0.9.0
+
+0.8 got you a first object. This is about the second, the fifth, and shipping them.
+
+### The research that shaped it
+
+**There are no liveries in base Simutrans.** Not "unimplemented here" — absent
+from the engine. `grep -rlnw livery src/` returns nothing; the only occurrence of
+the string is inside the word *delivery*. Liveries are a Simutrans **Extended**
+feature. **There is no day/night variant either** — the engine does it itself
+(`simview.cc` `hours2night[]`), from reserved colours in the one sprite you already
+rendered. And **a vehicle has no season**: its widest image key is
+`freightimage[%d][%s]`, cargo and nothing else.
+
+So "variant" means two different things, and the tool keeps them apart:
+
+- **Axis variants** — indexed inside one object, by the key the writer builds.
+  Phase 1 already makes their collections.
+- **Sibling objects** — a livery, a family member. Separate `name=`, separate
+  `.dat`. The engine has no idea they are related.
+
+Full derivation, per writer, in [docs/variants-in-simutrans.md](docs/variants-in-simutrans.md).
+
+### Added
+
+- **Variant Manager.** One base, N siblings, each a set of *overrides* — geometry
+  is never duplicated. Asking for a livery axis, a night axis, or a season on a
+  catenary is an **error that names the reason**. `AXES` is checked against
+  `core/dat_schema.json`, which is extracted from the engine's writers.
+
+  A variant's **key is not its name**: a name changes, and keying by name would
+  make a rename silently abandon the variant's overrides.
+
+- **Publication Package.** `plan()` before `write()`, so you see every file and
+  what is wrong with it before a byte is written. Every file is marked
+  **GENERATED or AUTHORED** — a maintainer needs to know which is output and which
+  is somebody's work. **Byte-reproducible**: fixed timestamps, sorted entries. No
+  licence is an **error**. Nothing is uploaded, ever.
+
+- **Component Library.** A component is a named collection in a `.blend` plus a
+  six-line sidecar. **No licence, no insert** — a library copies people's work into
+  people's projects, and an unlicensed component in somebody's pakset has no answer
+  to "may we ship this?". Absolute paths are refused, not normalised. We ship no
+  third-party art; the example component is modelled by the tests, in code.
+
+- **Sprite Preview** — and it *is* the final render. `render_directions` is
+  `prepare_directions()` plus a loop of `render_one_step()`; the preview calls those
+  same two functions for one heading. `blender_phase2.py` renders both and demands
+  the PNGs be **byte-identical**. Staleness is reported conservatively: a preview
+  believed current, and not, is worse than none.
+
+### Fixed
+
+Nothing in existing code — phase 2 adds, it does not repair. Two bugs were found
+and fixed **in phase 2's own new modules**, both by their own tests:
+
+- `variants.new_key` **reused dead keys** — delete `v00000000`, add a variant, get
+  `v00000000` back, and any stale reference silently means someone else's variant.
+  Its docstring claimed keys are never reused while the code reused them.
+- `variants.load` **raised** on `{"variants": 3}` while promising "never raises on
+  rubbish".
+
+### Changed
+
+- Three collapsible sub-panels — Variants, Components, Publish — closed by default.
+  Phase 1's flow is untouched: a first object needs none of this.
+
+### Not done
+
+- **Consist Manager** — deferred. It is about `Constraint[Prev]`/`[Next]` across
+  several `.dat` files, which is a different problem from variants of one, and the
+  five-car Civia already works without it.
+- **Batch Project Build** — `tools/run_tests.py` already renders, compiles and
+  loads every object in the repo. A second batch runner would be a second thing to
+  keep true.
+
 ## 0.8.0
 
 The kit could take a finished model anywhere. It could not help you start one.
