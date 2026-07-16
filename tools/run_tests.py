@@ -200,6 +200,13 @@ def suite_package():
                 "package")
 
 
+def suite_components():
+    """The component catalogue: licences, relative paths, missing parts."""
+    return _run([sys.executable, os.path.join("tests", "test_components.py")], ROOT,
+                "COMPONENT_TESTS_OK", ("COMPONENT_TESTS_FAILED", "Traceback"), 120,
+                "components")
+
+
 def suite_colours():
     """Does makeobj really recognise the colours we tell the artist to paint?"""
     r = _run([sys.executable, os.path.join("tests", "test_colours_makeobj.py")], ROOT,
@@ -521,6 +528,7 @@ SUITES = {
     "scenecheck": suite_scenecheck,
     "variants": suite_variants,
     "package": suite_package,
+    "components": suite_components,
     "schema": suite_schema,
     "colours": suite_colours,
     "profile": suite_profile,
@@ -560,7 +568,7 @@ SUITES = {
 # Producers first, then the .pak they feed, then the game. The order IS the loop:
 # nothing downstream of "paks" can pass on art that this run did not render.
 ORDER = ("core", "templates", "scenecheck", "variants", "package",
-         "schema", "colours", "profile",
+         "components", "schema", "colours", "profile",
          # producers: the art and the .dat. "template" leads them - it is what
          # makes the scene the rest of them render.
          "template",
