@@ -83,6 +83,78 @@ SOURCE_STRINGS = (
     "%d error(s) - fix these before rendering",
     "No errors. %d thing(s) to look at",
     "Nothing wrong that I can see from here",
+
+    # --- phase 2: variants, components, preview, publishing
+    'Variants',
+    'Variant',
+    'Variant name',
+    'What this variant is called. It becomes name= in its own .dat - a variant IS a separate object',
+    'The variant list, as JSON. Edited through the buttons - there is no need to read it',
+    'Repaint',
+    'The material this variant repaints. Leave empty for a variant that differs only in its numbers',
+    'To',
+    'A variant is a separate object,',
+    'with its own name and .dat.',
+    'No variants yet.',
+    '%d changed, the rest inherited',
+    'Add Variant',
+    'Add a sibling object: the same model, a different name and whatever numbers or paint you change. It gets its own .dat',
+    'Duplicate',
+    'Copy the selected variant, keeping what it changes',
+    'Rename',
+    'Rename the selected variant. Its identity does not move, so nothing it changes is lost',
+    'Remove',
+    'Delete the selected variant',
+    'Show in viewport',
+    'Make the scene look like this variant, so you can see it. It changes the materials, not the geometry',
+    'Check Variants',
+    'Duplicate names, broken references, and axes the engine does not actually index',
+    'Render All Variants',
+    'Render every variant, each to its own sheet and .dat. The geometry is rendered once per variant, never duplicated',
+    'Variant %s added (%d in all)',
+    '%s is now %s',
+    'Removed %s',
+    'No variant selected',
+    'Type the new name first',
+    'No variants to render',
+    '%s: %d material(s) repainted',
+    '%d variant(s), nothing wrong',
+    '%d variant(s) rendered: %s',
+    'Components',
+    'Component',
+    'Which component to bring in. Press Refresh to list what is available',
+    'How',
+    'Refresh',
+    'Look again for components, here and in the project folder',
+    'Insert Component',
+    'Bring a component into this scene, at its own anchor and the right size',
+    'Type a component key - press Refresh to see what is available',
+    'No component called %r',
+    "No components found. They live in a 'components' folder next to your .blend",
+    '%d component(s), %d usable: %s',
+    '%s inserted (%s), licence %s',
+    'Preview',
+    'Preview state',
+    'What the scene looked like when the preview was made. Not for editing',
+    "Render ONE heading through the final render's own code path, and check it. Not a second renderer - the same one, fewer headings",
+    "%s - heading '%s', same camera as the final render",
+    'The scene changed since that',
+    'preview. It is out of date.',
+    'Publish',
+    'Version',
+    'Licence',
+    'Required. Without one nobody may legally ship your work, and most paksets will not take it',
+    'A licence is required. Without',
+    'one nobody may ship your work.',
+    'Category',
+    'Description',
+    'Package to',
+    'Where the .zip goes. Nothing is uploaded',
+    'Build Package',
+    'Gather the .dat, the sprites, the licence and a manifest into one zip. Nothing is uploaded',
+    'Nothing is uploaded.',
+    '%s - %d file(s). Nothing was uploaded',
+    '%d error(s) - the package was NOT written',
     # operators
     "Build Rig",
     "Create the Simutrans camera and sun and set the render options this pakset needs",
@@ -714,6 +786,148 @@ SPANISH = {
     "draws the third. Use 2, 4 or 5.": "jamás la tercera. Usa 2, 4 o 5.",
     "A signal needs 2 aspects.": "Una señal necesita 2 aspectos.",
     "State 0 is RED.": "El estado 0 es ROJO.",
+
+    # --- fase 2: variantes, componentes, vista previa, publicación
+    'Variants':
+        'Variantes',
+    'Variant':
+        'Variante',
+    'Variant name':
+        'Nombre de la variante',
+    'What this variant is called. It becomes name= in its own .dat - a variant IS a separate object':
+        'Cómo se llama esta variante. Pasa a ser name= en su propio .dat: una variante ES un objeto aparte',
+    'The variant list, as JSON. Edited through the buttons - there is no need to read it':
+        'La lista de variantes, en JSON. Se edita con los botones; no hace falta leerla',
+    'Repaint':
+        'Repintar',
+    'The material this variant repaints. Leave empty for a variant that differs only in its numbers':
+        'El material que repinta esta variante. Déjalo vacío si la variante sólo cambia en los números',
+    'To':
+        'A',
+    'A variant is a separate object,':
+        'Una variante es un objeto aparte,',
+    'with its own name and .dat.':
+        'con su nombre y su .dat.',
+    'No variants yet.':
+        'Aún no hay variantes.',
+    '%d changed, the rest inherited':
+        '%d cambiados; el resto, heredados',
+    'Add Variant':
+        'Añadir variante',
+    'Add a sibling object: the same model, a different name and whatever numbers or paint you change. It gets its own .dat':
+        'Añade un objeto hermano: el mismo modelo, otro nombre y los números o la pintura que cambies. Tendrá su propio .dat',
+    'Duplicate':
+        'Duplicar',
+    'Copy the selected variant, keeping what it changes':
+        'Copia la variante seleccionada conservando lo que cambia',
+    'Rename':
+        'Renombrar',
+    'Rename the selected variant. Its identity does not move, so nothing it changes is lost':
+        'Renombra la variante seleccionada. Su identidad no se mueve, así que no se pierde nada de lo que cambia',
+    'Remove':
+        'Eliminar',
+    'Delete the selected variant':
+        'Borra la variante seleccionada',
+    'Show in viewport':
+        'Ver en la escena',
+    'Make the scene look like this variant, so you can see it. It changes the materials, not the geometry':
+        'Hace que la escena se vea como esta variante. Cambia los materiales, no la geometría',
+    'Check Variants':
+        'Comprobar variantes',
+    'Duplicate names, broken references, and axes the engine does not actually index':
+        'Nombres repetidos, referencias rotas y ejes que el motor no indexa en realidad',
+    'Render All Variants':
+        'Renderizar todas las variantes',
+    'Render every variant, each to its own sheet and .dat. The geometry is rendered once per variant, never duplicated':
+        'Renderiza cada variante en su propia hoja y su propio .dat. La geometría se renderiza una vez por variante; nunca se duplica',
+    'Variant %s added (%d in all)':
+        'Variante %s añadida (%d en total)',
+    '%s is now %s':
+        '%s ahora se llama %s',
+    'Removed %s':
+        'Eliminada %s',
+    'No variant selected':
+        'No hay ninguna variante seleccionada',
+    'Type the new name first':
+        'Escribe primero el nombre nuevo',
+    'No variants to render':
+        'No hay variantes que renderizar',
+    '%s: %d material(s) repainted':
+        '%s: %d material(es) repintados',
+    '%d variant(s), nothing wrong':
+        '%d variante(s); nada mal',
+    '%d variant(s) rendered: %s':
+        '%d variante(s) renderizadas: %s',
+    'Components':
+        'Componentes',
+    'Component':
+        'Componente',
+    'Which component to bring in. Press Refresh to list what is available':
+        'Qué componente traer. Pulsa Actualizar para ver los disponibles',
+    'How':
+        'Cómo',
+    'Refresh':
+        'Actualizar',
+    'Look again for components, here and in the project folder':
+        'Vuelve a buscar componentes, aquí y en la carpeta del proyecto',
+    'Insert Component':
+        'Insertar componente',
+    'Bring a component into this scene, at its own anchor and the right size':
+        'Trae un componente a esta escena, en su propio anclaje y con el tamaño correcto',
+    'Type a component key - press Refresh to see what is available':
+        'Escribe la clave de un componente; pulsa Actualizar para ver cuáles hay',
+    'No component called %r':
+        'No hay ningún componente llamado %r',
+    "No components found. They live in a 'components' folder next to your .blend":
+        "No se han encontrado componentes. Viven en una carpeta 'components' junto a tu .blend",
+    '%d component(s), %d usable: %s':
+        '%d componente(s), %d utilizables: %s',
+    '%s inserted (%s), licence %s':
+        '%s insertado (%s), licencia %s',
+    'Preview':
+        'Vista previa',
+    'Preview state':
+        'Estado de la vista previa',
+    'What the scene looked like when the preview was made. Not for editing':
+        'Cómo estaba la escena cuando se hizo la vista previa. No se edita',
+    "Render ONE heading through the final render's own code path, and check it. Not a second renderer - the same one, fewer headings":
+        'Renderiza UNA orientación por el mismo camino de código que el render final, y la comprueba. No es un segundo renderizador: es el mismo, con menos orientaciones',
+    "%s - heading '%s', same camera as the final render":
+        "%s - orientación '%s', la misma cámara que el render final",
+    'The scene changed since that':
+        'La escena ha cambiado desde esa',
+    'preview. It is out of date.':
+        'vista previa. Está desactualizada.',
+    'Publish':
+        'Publicar',
+    'Version':
+        'Versión',
+    'Licence':
+        'Licencia',
+    'Required. Without one nobody may legally ship your work, and most paksets will not take it':
+        'Obligatoria. Sin ella nadie puede distribuir legalmente tu trabajo, y la mayoría de paksets no lo aceptarán',
+    'A licence is required. Without':
+        'La licencia es obligatoria. Sin ella',
+    'one nobody may ship your work.':
+        'nadie puede distribuir tu trabajo.',
+    'Category':
+        'Categoría',
+    'Description':
+        'Descripción',
+    'Package to':
+        'Empaquetar en',
+    'Where the .zip goes. Nothing is uploaded':
+        'Dónde va el .zip. No se sube nada',
+    'Build Package':
+        'Crear paquete',
+    'Gather the .dat, the sprites, the licence and a manifest into one zip. Nothing is uploaded':
+        'Reúne el .dat, los sprites, la licencia y un manifiesto en un zip. No se sube nada',
+    'Nothing is uploaded.':
+        'No se sube nada.',
+    '%s - %d file(s). Nothing was uploaded':
+        '%s - %d archivo(s). No se ha subido nada',
+    '%d error(s) - the package was NOT written':
+        '%d error(es): el paquete NO se ha escrito',
 }
 
 

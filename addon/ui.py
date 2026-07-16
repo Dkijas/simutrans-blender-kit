@@ -25,13 +25,13 @@ from bpy.props import (BoolProperty, EnumProperty, FloatVectorProperty,
 from bpy.types import Operator, Panel, PropertyGroup
 
 try:
-    from . import rig, template, translations
-    from ..core import (buildings, colors, factories, night, paksets, scenecheck,
-                        schema, sheet, templates)
+    from . import library, rig, template, translations, workflow
+    from ..core import (buildings, colors, components, factories, night, package,
+                        paksets, scenecheck, schema, sheet, templates, variants)
 except ImportError:                                   # running from a checkout
-    from addon import rig, template, translations
-    from core import (buildings, colors, factories, night, paksets, scenecheck,
-                      schema, sheet, templates)
+    from addon import library, rig, template, translations, workflow
+    from core import (buildings, colors, components, factories, night, package,
+                      paksets, scenecheck, schema, sheet, templates, variants)
 
 CTX = translations.CONTEXT
 
@@ -343,6 +343,74 @@ class SimutransProps(PropertyGroup):
                     "metres - this is the pakset's own convention, and pak128's "
                     "is roughly 40",
     )
+
+    # --- variants.
+    #
+    # ONE string, holding the JSON core/variants.py owns. Not a CollectionProperty:
+    # that would put the format in bpy, where it could not be migrated without
+    # Blender and could not be tested without it either. This way an old .blend's
+    # variants are read by the same load() the tests exercise, and the schema
+    # version travels with the document.
+    variants_json: StringProperty(
+        name="Variants", translation_context=CTX, default="",
+        description="The variant list, as JSON. Edited through the buttons - "
+                    "there is no need to read it",
+    )
+    variant_index: IntProperty(name="Variant", translation_context=CTX,
+                               default=0, min=0)
+    variant_name: StringProperty(
+        name="Variant name", translation_context=CTX, default="",
+        description="What this variant is called. It becomes name= in its own "
+                    ".dat - a variant IS a separate object",
+    )
+    variant_material: StringProperty(
+        name="Repaint", translation_context=CTX, default="",
+        description="The material this variant repaints. Leave empty for a "
+                    "variant that differs only in its numbers",
+    )
+    variant_color: FloatVectorProperty(
+        name="To", translation_context=CTX, subtype="COLOR",
+        size=3, min=0.0, max=1.0, default=(0.5, 0.5, 0.5))
+
+    # --- components
+    component_key: StringProperty(
+        name="Component", translation_context=CTX, default="",
+        description="Which component to bring in. Press Refresh to list what is "
+                    "available",
+    )
+    component_mode: EnumProperty(
+        name="How", translation_context=CTX,
+        items=[("append", "Copy in", "a real copy. Yours forever, renders "
+                                     "anywhere - including on someone else's "
+                                     "machine"),
+               ("link", "Link", "the component's own .blend stays the master. "
+                                "Fix it once, every project updates - but the "
+                                "file must be there at render time"),
+               ("instance", "Instance", "one mesh, many copies. Cheap for eight "
+                                        "bogies")],
+        default="append",
+    )
+
+    # --- preview
+    preview_fingerprint: StringProperty(
+        name="Preview state", translation_context=CTX, default="",
+        description="What the scene looked like when the preview was made. Not "
+                    "for editing")
+
+    # --- publishing
+    pkg_version: StringProperty(name="Version", translation_context=CTX,
+                                default="1.0.0")
+    pkg_license: StringProperty(
+        name="Licence", translation_context=CTX, default="",
+        description="Required. Without one nobody may legally ship your work, "
+                    "and most paksets will not take it")
+    pkg_category: StringProperty(name="Category", translation_context=CTX,
+                                 default="vehicle")
+    pkg_description: StringProperty(name="Description", translation_context=CTX,
+                                    default="")
+    pkg_dir: StringProperty(
+        name="Package to", translation_context=CTX, subtype="DIR_PATH",
+        default="", description="Where the .zip goes. Nothing is uploaded")
 
 
 # WHAT TO MODEL, said in the panel, at the moment it matters. An artist should not
@@ -1238,6 +1306,20 @@ class SIMUTRANS_PT_panel(Panel):
         # an unsaved .blend is one of the things it exists to tell you about.
         val = box.column()
         val.operator("simutrans.validate", icon="CHECKMARK")
+
+        # Preview sits between Validate and Render: it is the render, of one
+        # heading, so it is the cheap way to see what the expensive one will say.
+        acts.operator("simutrans.preview", icon="SEQ_PREVIEW")
+        if p.preview_fingerprint and workflow.is_stale(bpy, p,
+                                                       p.preview_fingerprint):
+            # Saying so is the whole difference between a preview and a guess. A
+            # stale preview believed current is worse than none.
+            stale = acts.column()
+            stale.alert = True
+            stale.label(text="The scene changed since that", icon="ERROR",
+                        text_ctxt=CTX)
+            stale.label(text="preview. It is out of date.", text_ctxt=CTX)
+
         acts.operator("simutrans.render_sheet", icon="RENDER_ANIMATION")
         acts.operator("simutrans.write_dat", icon="FILE_TEXT")
         acts.operator("simutrans.check_colors", icon="COLOR")
@@ -1313,6 +1395,354 @@ class SIMUTRANS_PT_dat(Panel):
             warn.label(text="State 0 is RED.", text_ctxt=CTX)
 
 
+def _vset(p):
+    """The variant document, parsed. core/variants.py owns the format."""
+    return variants.load(p.variants_json, p.obj_type)
+
+
+def _save_vset(p, vset):
+    p.variants_json = variants.dump(vset)
+
+
+def _base_fields(p):
+    """The panel's own values, as the dict a variant is a diff against."""
+    return {name: getattr(p, name) for name in _DAT_FIELDS[p.obj_type]}
+
+
+def _current(p):
+    vset = _vset(p)
+    if not vset.variants:
+        return vset, None
+    i = min(p.variant_index, len(vset.variants) - 1)
+    return vset, vset.variants[i]
+
+
+class SIMUTRANS_OT_variant_add(Operator):
+    bl_idname = "simutrans.variant_add"
+    bl_label = "Add Variant"
+    bl_translation_context = CTX
+    bl_description = ("Add a sibling object: the same model, a different name and "
+                      "whatever numbers or paint you change. It gets its own .dat")
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        vset = _vset(p)
+        name = (p.variant_name or "").strip() or "%s_%d" % (
+            p.obj_name or "Variant", len(vset.variants) + 1)
+        mats = {}
+        if p.variant_material.strip():
+            mats[p.variant_material.strip()] = tuple(
+                int(round(c * 255)) for c in p.variant_color)
+        vset, v = variants.add(vset, name, materials=mats)
+        _save_vset(p, vset)
+        p.variant_index = len(vset.variants) - 1
+        say(self, {"INFO"}, _("Variant %s added (%d in all)")
+            % (v.name, len(vset.variants)))
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_variant_duplicate(Operator):
+    bl_idname = "simutrans.variant_duplicate"
+    bl_label = "Duplicate"
+    bl_translation_context = CTX
+    bl_description = "Copy the selected variant, keeping what it changes"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        vset, cur = _current(p)
+        if cur is None:
+            say(self, {"ERROR"}, _("No variant selected"))
+            return {"CANCELLED"}
+        vset, copy = variants.duplicate(vset, cur.key)
+        _save_vset(p, vset)
+        p.variant_index = len(vset.variants) - 1
+        say(self, {"INFO"}, _("Variant %s added (%d in all)")
+            % (copy.name, len(vset.variants)))
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_variant_rename(Operator):
+    bl_idname = "simutrans.variant_rename"
+    bl_label = "Rename"
+    bl_translation_context = CTX
+    bl_description = ("Rename the selected variant. Its identity does not move, "
+                      "so nothing it changes is lost")
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        vset, cur = _current(p)
+        if cur is None:
+            say(self, {"ERROR"}, _("No variant selected"))
+            return {"CANCELLED"}
+        name = (p.variant_name or "").strip()
+        if not name:
+            say(self, {"ERROR"}, _("Type the new name first"))
+            return {"CANCELLED"}
+        _save_vset(p, variants.rename(vset, cur.key, name))
+        say(self, {"INFO"}, _("%s is now %s") % (cur.name, name))
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_variant_remove(Operator):
+    bl_idname = "simutrans.variant_remove"
+    bl_label = "Remove"
+    bl_translation_context = CTX
+    bl_description = "Delete the selected variant"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        vset, cur = _current(p)
+        if cur is None:
+            say(self, {"ERROR"}, _("No variant selected"))
+            return {"CANCELLED"}
+        _save_vset(p, variants.remove(vset, cur.key))
+        p.variant_index = max(0, p.variant_index - 1)
+        say(self, {"INFO"}, _("Removed %s") % cur.name)
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_variant_apply(Operator):
+    bl_idname = "simutrans.variant_apply"
+    bl_label = "Show in viewport"
+    bl_translation_context = CTX
+    bl_description = ("Make the scene look like this variant, so you can see it. "
+                      "It changes the materials, not the geometry")
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        _vs, cur = _current(p)
+        if cur is None:
+            say(self, {"ERROR"}, _("No variant selected"))
+            return {"CANCELLED"}
+        changed = workflow.apply_variant(bpy, cur, p.pakset)
+        say(self, {"INFO"}, _("%s: %d material(s) repainted")
+            % (cur.name, len(changed["materials"])))
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_variant_check(Operator):
+    bl_idname = "simutrans.variant_check"
+    bl_label = "Check Variants"
+    bl_translation_context = CTX
+    bl_description = ("Duplicate names, broken references, and axes the engine "
+                      "does not actually index")
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        vset = _vset(p)
+        findings = variants.check(vset, _base_fields(p),
+                                  collections=workflow.scene_collections(bpy),
+                                  materials=workflow.scene_materials(bpy))
+        for f in findings:
+            level = {variants.ERROR: "ERROR",
+                     variants.WARNING: "WARNING"}.get(f.level, "INFO")
+            say(self, {level}, "%s: %s" % (f.code, _(f.message)))
+        errs = variants.blocking(findings)
+        if errs:
+            say(self, {"ERROR"}, _("%d error(s) - fix these before rendering")
+                % len(errs))
+        else:
+            say(self, {"INFO"}, _("%d variant(s), nothing wrong")
+                % len(vset.variants))
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_render_variants(Operator):
+    bl_idname = "simutrans.render_variants"
+    bl_label = "Render All Variants"
+    bl_translation_context = CTX
+    bl_description = ("Render every variant, each to its own sheet and .dat. The "
+                      "geometry is rendered once per variant, never duplicated")
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        out, why = _out_dir(p)
+        if out is None:
+            say(self, {"ERROR"}, why)
+            return {"CANCELLED"}
+
+        vset = _vset(p)
+        if not vset.variants:
+            say(self, {"ERROR"}, _("No variants to render"))
+            return {"CANCELLED"}
+
+        base = _base_fields(p)
+        errs = variants.blocking(variants.check(
+            vset, base, collections=workflow.scene_collections(bpy),
+            materials=workflow.scene_materials(bpy)))
+        if errs:
+            # Refused rather than half-done: N-1 correct .dat files and one wrong
+            # one is worse than none, because the wrong one looks finished.
+            for f in errs:
+                say(self, {"ERROR"}, "%s: %s" % (f.code, _(f.message)))
+            say(self, {"ERROR"}, _("%d error(s) - fix these before rendering")
+                % len(errs))
+            return {"CANCELLED"}
+
+        made = []
+        for v in vset.variants:
+            workflow.apply_variant(bpy, v, p.pakset)
+            fields = variants.resolve(v, base)
+            frames = rig.render_directions(
+                bpy, out, p.pakset, dirs=int(p.dirs), basename=v.name,
+                align_offset=tuple(p.align_offset))
+            _png, dat, _pl = rig.build_sheet_and_dat(
+                frames, out, p.pakset, basename=v.name, cols=4,
+                name=fields["obj_name"], author=fields.get("author", ""),
+                waytype=fields.get("waytype", "track"),
+                engine_type=fields.get("engine_type", "diesel"),
+                speed=fields.get("speed", 100), power=fields.get("power", 0),
+                weight=fields.get("weight", 20), length=fields.get("length", 8),
+                payload=fields.get("payload", 0),
+                freight=fields.get("freight", "None"),
+                cost=fields.get("cost", 0),
+                runningcost=fields.get("runningcost", 0),
+                intro_year=fields.get("intro_year", 1900),
+                constraint_prev=_names(fields.get("constraint_prev", "")),
+                constraint_next=_names(fields.get("constraint_next", "")))
+            made.append(os.path.basename(dat))
+            _report_lint(self, dat)
+
+        say(self, {"INFO"}, _("%d variant(s) rendered: %s")
+            % (len(made), ", ".join(made)))
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_refresh_components(Operator):
+    bl_idname = "simutrans.refresh_components"
+    bl_label = "Refresh"
+    bl_translation_context = CTX
+    bl_description = "Look again for components, here and in the project folder"
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        comps = library.catalogue(bpy)
+        usable = components.usable(comps, p.pakset)
+        for c in comps:
+            for f in components.check(c, p.pakset):
+                if f.level == components.ERROR:
+                    say(self, {"WARNING"}, "%s: %s" % (c.key, _(f.message)))
+        if not comps:
+            say(self, {"INFO"},
+                _("No components found. They live in a 'components' folder next "
+                  "to your .blend"))
+            return {"FINISHED"}
+        say(self, {"INFO"}, _("%d component(s), %d usable: %s")
+            % (len(comps), len(usable), ", ".join(c.key for c in usable)))
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_insert_component(Operator):
+    bl_idname = "simutrans.insert_component"
+    bl_label = "Insert Component"
+    bl_translation_context = CTX
+    bl_description = ("Bring a component into this scene, at its own anchor and "
+                      "the right size")
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        key = (p.component_key or "").strip()
+        if not key:
+            say(self, {"ERROR"}, _("Type a component key - press Refresh to "
+                                   "see what is available"))
+            return {"CANCELLED"}
+        comp = library.find(key, bpy)
+        if comp is None:
+            say(self, {"ERROR"}, _("No component called %r") % key)
+            return {"CANCELLED"}
+        try:
+            col = library.insert(bpy, comp, p.component_mode,
+                                 pakset_name=p.pakset)
+        except ValueError as e:
+            say(self, {"ERROR"}, str(e))
+            return {"CANCELLED"}
+        for f in components.check(comp, p.pakset):
+            if f.level == components.WARNING:
+                say(self, {"WARNING"}, _(f.message))
+        say(self, {"INFO"}, _("%s inserted (%s), licence %s")
+            % (comp.name or comp.key, p.component_mode, comp.license))
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_preview(Operator):
+    bl_idname = "simutrans.preview"
+    bl_label = "Preview"
+    bl_translation_context = CTX
+    bl_description = ("Render ONE heading through the final render's own code "
+                      "path, and check it. Not a second renderer - the same one, "
+                      "fewer headings")
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        out, why = _out_dir(p)
+        if out is None:
+            say(self, {"ERROR"}, why)
+            return {"CANCELLED"}
+        mins, maxs = rig.scene_bounds(bpy)
+        if maxs[2] <= mins[2]:
+            say(self, {"ERROR"}, _("Nothing to render - the scene has no mesh"))
+            return {"CANCELLED"}
+
+        png, mark = workflow.preview(bpy, out, p)
+        p.preview_fingerprint = mark
+        for line in workflow.preview_report(bpy, png, p):
+            say(self, {"INFO"}, line)
+        say(self, {"INFO"}, _("%s - heading '%s', same camera as the final render")
+            % (os.path.basename(png), workflow.PREVIEW_CODE))
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_package(Operator):
+    bl_idname = "simutrans.package"
+    bl_label = "Build Package"
+    bl_translation_context = CTX
+    bl_description = ("Gather the .dat, the sprites, the licence and a manifest "
+                      "into one zip. Nothing is uploaded")
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        out, why = _out_dir(p)
+        if out is None:
+            say(self, {"ERROR"}, why)
+            return {"CANCELLED"}
+
+        vset = _vset(p)
+        objects = tuple(v.name for v in vset.variants) or (p.obj_name,)
+        man = package.Manifest(
+            name=p.obj_name, author=p.author, version=p.pkg_version,
+            license=p.pkg_license, pakset=p.pakset, category=p.pkg_category,
+            description=p.pkg_description, objects=objects)
+        pkg = package.plan(out, man)
+
+        for f in package.check(pkg):
+            level = {package.ERROR: "ERROR",
+                     package.WARNING: "WARNING"}.get(f.level, "INFO")
+            say(self, {level}, "%s: %s" % (f.code, _(f.message)))
+
+        errs = package.blocking(package.check(pkg))
+        if errs:
+            say(self, {"ERROR"}, _("%d error(s) - the package was NOT written")
+                % len(errs))
+            return {"CANCELLED"}
+
+        dest = bpy.path.abspath(p.pkg_dir) if p.pkg_dir else out
+        zip_path = os.path.join(dest, "%s.zip" % (p.obj_name or "package"))
+        try:
+            package.write(pkg, zip_path, prefix=p.obj_name or "")
+        except (ValueError, OSError) as e:
+            say(self, {"ERROR"}, str(e))
+            return {"CANCELLED"}
+        say(self, {"INFO"}, _("%s - %d file(s). Nothing was uploaded")
+            % (os.path.basename(zip_path), len(pkg.files)))
+        return {"FINISHED"}
+
+
 class SIMUTRANS_PT_reference(Panel):
     """Reference photos. A sub-panel, closed by default, because an artist who
     has no photo should not have to scroll past six fields to reach Render."""
@@ -1337,13 +1767,128 @@ class SIMUTRANS_PT_reference(Panel):
         act.operator("simutrans.setup_reference", icon="IMAGE_REFERENCE")
 
 
+class SIMUTRANS_PT_variants(Panel):
+    """Sibling objects. Closed by default: a first object needs none of this."""
+    bl_label = "Variants"
+    bl_translation_context = CTX
+    bl_idname = "SIMUTRANS_PT_variants"
+    bl_parent_id = "SIMUTRANS_PT_panel"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Simutrans"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    def draw(self, context):
+        p = context.scene.simutrans
+        col = self.layout.column()
+        vset, cur = _current(p)
+
+        # THE thing an artist needs told, and the engine's own limit. A variant is
+        # a separate object; it is not a livery slot, because there is no such
+        # slot in base Simutrans.
+        col.label(text="A variant is a separate object,", icon="INFO",
+                  text_ctxt=CTX)
+        col.label(text="with its own name and .dat.", text_ctxt=CTX)
+
+        col.prop(p, "variant_name")
+        col.prop(p, "variant_material")
+        col.prop(p, "variant_color")
+        row = col.row(align=True)
+        row.operator("simutrans.variant_add", icon="ADD")
+        row.operator("simutrans.variant_duplicate", icon="DUPLICATE")
+
+        if not vset.variants:
+            col.label(text="No variants yet.", text_ctxt=CTX)
+            return
+
+        col.separator()
+        col.prop(p, "variant_index", slider=True)
+        if cur is not None:
+            box = col.box()
+            box.label(text=cur.name, icon="OBJECT_DATA", text_ctxt=CTX)
+            # What it INHERITS. An artist looking at a variant needs to know what
+            # they are not looking at: a field they believe they set and did not
+            # is how a whole family ships with one car's weight.
+            n_over = len(cur.overrides or {}) + len(cur.materials or {})
+            box.label(text=_("%d changed, the rest inherited") % n_over,
+                      text_ctxt=CTX)
+            row = box.row(align=True)
+            row.operator("simutrans.variant_rename", icon="GREASEPENCIL")
+            row.operator("simutrans.variant_remove", icon="X")
+            box.operator("simutrans.variant_apply", icon="HIDE_OFF")
+
+        col.separator()
+        col.operator("simutrans.variant_check", icon="CHECKMARK")
+        acts = col.column()
+        acts.enabled = _out_dir(p)[0] is not None
+        acts.operator("simutrans.render_variants", icon="RENDER_ANIMATION")
+
+
+class SIMUTRANS_PT_components(Panel):
+    bl_label = "Components"
+    bl_translation_context = CTX
+    bl_idname = "SIMUTRANS_PT_components"
+    bl_parent_id = "SIMUTRANS_PT_panel"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Simutrans"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    def draw(self, context):
+        p = context.scene.simutrans
+        col = self.layout.column()
+        col.prop(p, "component_key")
+        col.prop(p, "component_mode")
+        row = col.row(align=True)
+        row.operator("simutrans.refresh_components", icon="FILE_REFRESH")
+        row.operator("simutrans.insert_component", icon="IMPORT")
+
+
+class SIMUTRANS_PT_publish(Panel):
+    bl_label = "Publish"
+    bl_translation_context = CTX
+    bl_idname = "SIMUTRANS_PT_publish"
+    bl_parent_id = "SIMUTRANS_PT_panel"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Simutrans"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    def draw(self, context):
+        p = context.scene.simutrans
+        col = self.layout.column()
+        col.prop(p, "pkg_version")
+        col.prop(p, "pkg_license")
+        if not p.pkg_license.strip():
+            warn = col.column()
+            warn.alert = True
+            warn.label(text="A licence is required. Without", icon="ERROR",
+                       text_ctxt=CTX)
+            warn.label(text="one nobody may ship your work.", text_ctxt=CTX)
+        col.prop(p, "pkg_category")
+        col.prop(p, "pkg_description")
+        col.prop(p, "pkg_dir")
+        acts = col.column()
+        acts.enabled = _out_dir(p)[0] is not None
+        acts.operator("simutrans.package", icon="PACKAGE")
+        col.label(text="Nothing is uploaded.", icon="INFO", text_ctxt=CTX)
+
+
 CLASSES = (SimutransProps, SIMUTRANS_OT_build_rig, SIMUTRANS_OT_create_template,
            SIMUTRANS_OT_setup_reference, SIMUTRANS_OT_validate,
            SIMUTRANS_OT_render_sheet,
            SIMUTRANS_OT_write_dat, SIMUTRANS_OT_check_colors,
            SIMUTRANS_OT_night_preview, SIMUTRANS_OT_apply_material,
-           SIMUTRANS_OT_compile_pak, SIMUTRANS_PT_panel, SIMUTRANS_PT_dat,
-           SIMUTRANS_PT_reference)
+           SIMUTRANS_OT_compile_pak,
+           SIMUTRANS_OT_variant_add, SIMUTRANS_OT_variant_duplicate,
+           SIMUTRANS_OT_variant_rename, SIMUTRANS_OT_variant_remove,
+           SIMUTRANS_OT_variant_apply, SIMUTRANS_OT_variant_check,
+           SIMUTRANS_OT_render_variants,
+           SIMUTRANS_OT_refresh_components, SIMUTRANS_OT_insert_component,
+           SIMUTRANS_OT_preview, SIMUTRANS_OT_package,
+           SIMUTRANS_PT_panel, SIMUTRANS_PT_dat,
+           SIMUTRANS_PT_reference, SIMUTRANS_PT_variants,
+           SIMUTRANS_PT_components, SIMUTRANS_PT_publish)
 
 
 _TRANSLATION_DOMAIN = "simutrans_blender_kit"

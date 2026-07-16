@@ -394,6 +394,11 @@ def suite_blender_template():
     return _blender("blender_template.py", "TEMPLATE_OK")
 
 
+def suite_blender_phase2():
+    """Variants, components, and the proof that the preview IS the final render."""
+    return _blender("blender_phase2.py", "PHASE2_OK")
+
+
 def suite_blender_way():
     """A way: six models turned into sixteen ribi images, checked pixel by pixel."""
     return _blender("blender_way.py", "WAY_OK")
@@ -533,6 +538,7 @@ SUITES = {
     "colours": suite_colours,
     "profile": suite_profile,
     "template": suite_blender_template,
+    "phase2": suite_blender_phase2,
     "e2e": suite_blender_e2e,
     "alignment": suite_blender_alignment,
     "building": suite_blender_building,
@@ -571,7 +577,7 @@ ORDER = ("core", "templates", "scenecheck", "variants", "package",
          "components", "schema", "colours", "profile",
          # producers: the art and the .dat. "template" leads them - it is what
          # makes the scene the rest of them render.
-         "template",
+         "template", "phase2",
          "e2e", "alignment", "building", "footprint", "way", "freight", "tunnel",
          "bridge", "infra", "addon", "panel", "demo-all", "demo-loco",
          # the .pak the game will load, compiled from what was just rendered
