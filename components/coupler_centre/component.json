@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "key": "coupler_centre",
+  "name": "Centre coupler",
+  "category": "coupler",
+  "author": "simutrans-blender-kit",
+  "license": "MIT",
+  "version": "1.0.0",
+  "blend": "coupler_centre.blend",
+  "collection": "coupler",
+  "anchor": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "pakset": "",
+  "note": "A centre buffer coupler at UIC height (1.06 m above the rail). Origin at the rail head, so it lands at the right height on its own."
+}

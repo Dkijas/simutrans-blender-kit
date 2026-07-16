@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "key": "bogie_2axle",
+  "name": "Two-axle bogie",
+  "category": "bogie",
+  "author": "simutrans-blender-kit",
+  "license": "MIT",
+  "version": "1.0.0",
+  "blend": "bogie_2axle.blend",
+  "collection": "bogie",
+  "anchor": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "pakset": "",
+  "note": "A short passenger bogie: two wheelsets at a 2.5 m wheelbase, in a frame, with a bolster to hang a body from. Origin at the rail head."
+}

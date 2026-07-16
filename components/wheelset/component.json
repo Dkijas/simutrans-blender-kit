@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "key": "wheelset",
+  "name": "Wheelset",
+  "category": "wheel",
+  "author": "simutrans-blender-kit",
+  "license": "MIT",
+  "version": "1.0.0",
+  "blend": "wheelset.blend",
+  "collection": "wheel",
+  "anchor": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "pakset": "",
+  "note": "Two 0.92 m wheels on an axle at 1.435 m gauge. Origin at the rail head, on the centreline: put it where the axle goes and it sits on the rail."
+}

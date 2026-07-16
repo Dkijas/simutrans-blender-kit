@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "key": "pantograph_single",
+  "name": "Single-arm pantograph",
+  "category": "pantograph",
+  "author": "simutrans-blender-kit",
+  "license": "MIT",
+  "version": "1.0.0",
+  "blend": "pantograph_single.blend",
+  "collection": "pantograph",
+  "anchor": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "pakset": "",
+  "note": "Folded to about 4 m, which is roughly where pak128's catenary contact wire runs. Origin at its base: lift it to your roof."
+}
