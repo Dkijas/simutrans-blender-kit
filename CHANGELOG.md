@@ -1,5 +1,90 @@
 # Changelog
 
+## 0.8.0
+
+The kit could take a finished model anywhere. It could not help you start one.
+
+### Added
+
+- **Create Template.** The panel now makes the scene instead of describing it.
+  Every module in `core/` *reads* a finished scene — `render_way` looks for
+  `way_curve`, `has_tunnel_model` looks for `tunnel_portal`,
+  `collection_variant_setup` looks for `season_1` — and nothing anywhere *wrote*
+  them. The artist typed those names by hand from three lines of prose in the
+  panel, and a typo was not an error: it was a piece that silently never rendered.
+  `core/templates.py` is the inverse of the readers.
+
+  The names are **derived, never re-typed**. `way_curve` is not spelled out in the
+  new module; it is the prefix plus a name from `ways.PIECE_NAMES`, the same tuple
+  `render_way` iterates. The bridge collections come from
+  `bridges.GROUP_COLLECTION`, the dict the bridge renderer looks them up in. A
+  template that agrees with the renderer today and drifts tomorrow would be worse
+  than no template — it would name a collection nothing reads, with a tool's
+  authority behind it.
+
+- **Guides**: a tile at ground level, the `+X` nose arrow, the declared length
+  drawn as a box, a building's footprint and its `−Y` façade. They are Blender
+  **empties**, which is load-bearing rather than incidental — see *Fixed* below.
+
+- **Place Reference.** A photo where the model goes, scaled from the real metres
+  you type. Metres → tiles → Blender units is where an artist who has not read the
+  pakset docs goes wrong, and it does not announce itself: a bus modelled 20% large
+  is just a slightly wrong bus. Nothing is downloaded. It reuses Blender's own
+  reference-image mechanism, so there is no second render path.
+
+- **Validate.** Everything the kit already refused, it refused *during or after*
+  the render: `warn_if_clipped` reads the finished PNGs, `schema.lint` reads the
+  finished `.dat`, Check Colours needs a sheet on disk. And the two mistakes that
+  cost most survive the render perfectly — a model facing the wrong way, or built
+  three units above the ground, yields a clean sheet, a `.dat` that lints, and a
+  vehicle that flies. `core/scenecheck.py` is pure, so every rule is tested from a
+  literal without Blender in the loop.
+
+  `ERROR` blocks, `WARNING` does not, and the bar for `ERROR` is deliberately high:
+  an artist whose correct scene is refused turns the check off, and then it protects
+  nobody. A wheel rim 5 mm below `z=0` is ordinary art and is not reported.
+
+  The rule worth the module on its own is `length-mismatch`. `length` does not
+  scale the sprite — it is what the engine trails the *next* car by
+  (`simconvoi.cc:428`). Declare 8, model 16, and every sprite draws full size and
+  overlaps its neighbour by half a tile. Nowhere in Blender is that visible; it
+  appears in a depot.
+
+### Fixed
+
+- **`has_slope_model` and `has_wayobj_slope_model` asked only whether the
+  collection EXISTED**, while their five siblings — `has_tunnel_model`,
+  `has_bridge_model`, `has_front_parts`, `_has_collection` — all require
+  `and col.objects`. Indistinguishable from the truth while the only way to have a
+  `way_slope` was to make one by hand and fill it. The template lists `way_slope`
+  for every way, so the **empty collection becomes the common case**, and answering
+  yes to it would send `render_way_slopes` off to photograph nothing: blank slope
+  images in the `.dat`, and the way invisible on every hill. Silently — which is
+  the exact failure the slope image exists to prevent, arrived at from the other
+  side. Found by a test written for the template, not by reading the code.
+
+### Changed
+
+- The panel's first box is **Start**, not Rig. Its first button used to be *Build
+  Rig* — a camera and a sun, which is the *second* thing an artist needs. There was
+  no first thing.
+- The five collection prefixes live in `core/templates.py`; `addon/rig.py` imports
+  them. One spelling, not two that happen to match. `season_`, `phase_` and
+  `state_` had no home at all — they were string literals in `addon/ui.py`, bound
+  to the renderer only by a docstring and a line of prose in the panel.
+
+### Not done
+
+- **A component library** (wheels, bogies, pantographs) and a **variant manager**
+  were considered and deferred. Neither is blocked by anything; both are worth more
+  once an artist can reliably produce a *first* object, which is what this release
+  is about.
+- The vehicle template makes **no collections**, on purpose. `render_directions`
+  photographs whatever is in the scene, so a `Body` / `Bogie_Front` tree would be
+  convention dressed as mechanism — and a `Lights_Night` collection would be an
+  outright lie, because night lights come from *materials*, which the Materials box
+  already does.
+
 ## 0.7.0
 
 Pakset profiles measured against the real pakset, not transcribed and hoped.

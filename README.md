@@ -96,8 +96,35 @@ To build the zip from source instead:
 python tools/build_addon_zip.py      # writes build/simutrans_blender_kit.zip
 ```
 
-Model your vehicle **standing on `z = 0`, centred on the world origin, nose along
-+X**, then: *Build Rig* → *Render Sheet* → *Check Colours* → *Compile .pak*.
+Then, in the panel: *Create Template* → *Build Rig* → model → *Validate* →
+*Render Sheet* → *Check Colours* → *Compile .pak*.
+
+**[Create your first vehicle](docs/create-your-first-vehicle.md)** walks through all
+nine steps and assumes no Simutrans experience.
+
+*Create Template* is the first button because it used to not exist. Everything the
+kit knew about a scene, it knew how to **read**: `render_way` looks for a
+collection called `way_curve`, `has_tunnel_model` looks for `tunnel_portal`,
+`collection_variant_setup` looks for `season_1`. Nothing anywhere **wrote** them —
+so the artist typed those names by hand, from three lines of prose in the panel,
+and a typo was not an error. It was a piece that silently never rendered.
+
+Now the panel makes them, along with guides for the three conventions no field can
+express: a tile at ground level, the `+X` nose arrow, and the length you declared
+drawn as a box to fill. The names it makes are **derived from the modules that read
+them**, never re-typed — a template that drifted from the renderer would be worse
+than none, because it would name a dead collection with a tool's authority behind
+it.
+
+The guides are Blender **empties**, and that is deliberate: `scene_bounds()` walks
+every *mesh* and skips only the camera and sun by name, so a guide made of geometry
+would join your model's bounding box and break the very framing it exists to help.
+
+*Validate* is the other new one. Everything the kit refused, it used to refuse
+*after* the render — and the two mistakes that cost most survive a render
+perfectly. A model facing the wrong way, or built three units above the ground,
+gives you a clean sheet, a `.dat` that lints, a `.pak` that compiles, and a train
+that flies. Nothing downstream is wrong. The model is.
 
 *Compile .pak* needs `makeobj`, which is not shipped with anything — build it once
 from the Simutrans source:
@@ -132,6 +159,8 @@ written into the `.dat` and read by makeobj.
 ```
 __init__.py      the add-on entry point (bl_info, register)
 core/            pure Python, stdlib only — runs inside Blender or standalone
+  templates.py     what each object needs, and the guides — the inverse of the readers
+  scenecheck.py    is this scene worth rendering? ERROR / WARNING / INFORMATION
   projection.py    the exact camera geometry, and the alignment (+ derivations)
   directions.py    the engine's direction codes and fallback rules
   paksets.py       pak64/128/192/256 profiles, measured from the real pakset
@@ -149,6 +178,7 @@ core/            pure Python, stdlib only — runs inside Blender or standalone
   schema.py        the .dat linter (keys read from the engine's writers)
 addon/
   rig.py           Blender: build rig, render N directions/pieces, sheet + .dat
+  template.py      Blender: make the collections and guides; describe a scene
   ui.py            the Simutrans sidebar tab
   translations.py  the panel's strings, per language (plain data, no bpy)
 examples/
@@ -164,8 +194,11 @@ tools/
   extract_dat_schema.py  re-derives the linter's key list from the engine
   run_tests.py         renders, compiles and runs the whole suite
 tests/
-  test_core.py         1,145 checks, no Blender needed
+  test_core.py         1,240 checks, no Blender needed
+  test_templates.py    does the template name what the renderer actually reads?
+  test_scenecheck.py   every rule, on a scene that trips it and one that does not
   test_pakset_profile.py  profiles vs. the real pakset's simuconf.tab
+  blender_template.py  Create Template and Validate, inside Blender
   blender_e2e.py       full pipeline inside Blender (model → sheet → .dat)
   blender_alignment.py the tile quad lands at 3/4; opposite headings match
   blender_addon.py     installs the zip and drives the panel's own buttons
@@ -595,11 +628,19 @@ All three go red.
 
 ## Status
 
-The full suite is **35 suites, all green** (`python tools/run_tests.py`), from the
+The full suite is **38 suites, all green** (`python tools/run_tests.py`), from the
 Blender-free core checks through the Blender renders to the headless game, including
 scenarios on a real **pak128**.
 
-* `core` — **1,145 checks pass** (`python tests/test_core.py`).
+* `core` — **1,240 checks pass** (`python tests/test_core.py`).
+* `templates` and `scenecheck` — **159 checks**, no Blender. The template is
+  checked against `addon.rig` and `core.ways` rather than against a list written in
+  the test, because a third copy of a name is a third thing to drift. Every
+  validation rule is checked twice: on a scene that trips it, and on one that must
+  not.
+* `template` — Create Template and Validate inside Blender: the guides do not move
+  `scene_bounds`, pressing the button twice adds nothing, and a scene built from
+  the template renders to a `.dat` that lints clean.
 * Blender pipeline — **end-to-end green on Blender 5.1**
   (`blender --background --python tests/blender_e2e.py` → `E2E_OK`):
   renders 8 × 128×128 RGBA, assembles a 4×2 sheet, writes a compilable `.dat`,
