@@ -162,6 +162,9 @@ core/            pure Python, stdlib only — runs inside Blender or standalone
   templates.py     what each object needs, and the guides — the inverse of the readers
   scenecheck.py    is this scene worth rendering? ERROR / WARNING / INFORMATION
   variants.py      one scene, many sibling objects. The axes the engine really has
+  consists.py      say the train once; the coupling rules fall out
+  document.py      the one persisted document, and its migrations
+  contact.py       the eight headings on one labelled page
   package.py       gather, check and zip a release. Reproducible; uploads nothing
   components.py    the reusable-part catalogue, and its licence rules
   projection.py    the exact camera geometry, and the alignment (+ derivations)
@@ -182,7 +185,8 @@ core/            pure Python, stdlib only — runs inside Blender or standalone
 addon/
   rig.py           Blender: build rig, render N directions/pieces, sheet + .dat
   template.py      Blender: make the collections and guides; describe a scene
-  workflow.py      Blender: apply a variant; the preview (= the final render)
+  workflow.py      Blender: apply a variant, put the scene back; the preview
+                   (= the final render, of fewer headings)
   library.py       Blender: pull a component out of its .blend
   ui.py            the Simutrans sidebar tab
   translations.py  the panel's strings, per language (plain data, no bpy)
@@ -192,8 +196,10 @@ examples/
   demo_all.py      one of every object type
   civia.py         a five-car pak128 unit (Civia S/465)
   cercanias.py     a commuter set
+components/      five reusable parts, BUILT from tools/build_components.py
 tools/
   build_addon_zip.py
+  build_components.py  makes components/ from primitives defined in that file
   lint_dat.py          the linter, standalone
   measure_pakset.py    reads a real pakset's tile_height / height factor
   extract_dat_schema.py  re-derives the linter's key list from the engine
@@ -202,6 +208,7 @@ tests/
   test_core.py         1,240 checks, no Blender needed
   test_templates.py    does the template name what the renderer actually reads?
   test_scenecheck.py   every rule, on a scene that trips it and one that does not
+  test_consists.py     the engine's real coupling vocabulary, and the union
   test_pakset_profile.py  profiles vs. the real pakset's simuconf.tab
   blender_template.py  Create Template and Validate, inside Blender
   blender_e2e.py       full pipeline inside Blender (model → sheet → .dat)
@@ -665,9 +672,36 @@ copies people's work into people's projects — that is the point of it, and it 
 why an unlicensed component in somebody's pakset, with no answer to "may we ship
 this?", is a thing the kit will not cause. We ship no third-party art.
 
+## Trains
+
+A metro unit is not one long sprite - one image is capped at one tile, so a six-car
+train is six objects. What makes them a train is `Constraint[Prev]` and
+`Constraint[Next]`, and `can_follow` (`vehicle_desc.h:219`) decides all of it from
+one fact: **`prev_veh == NULL` means "nothing in front of me" - the head.**
+
+| Written | at the head | behind a real vehicle |
+|---|---|---|
+| *(nothing)* | yes | yes |
+| `none` | **yes** | no |
+| `any` | **no** | **yes** |
+
+So **`any` is how you say "middle only"** - the reverse of how the word reads.
+[The whole derivation](docs/constraints-in-simutrans.md), including the two things
+this repo had wrong before phase 3.
+
+The **Consist Manager** is the front end for that: describe the train, and the
+rules fall out. Its real work is the **union** - a motor car that sits behind a cab
+in the 4-car set and behind a trailer in the 6-car set needs both in its
+`Constraint[Prev]`. Miss one and the game does not complain; it just refuses to let
+the player build that train, and never says why.
+
+*Show Constraints* prints a diff and **writes nothing**.
+[Build a metro family](docs/build-a-metro-family.md) walks the whole thing: three
+cars, two liveries, two formations, a package.
+
 ## Status
 
-The full suite is **42 suites, all green** (`python tools/run_tests.py`), from the
+The full suite is **45 suites, all green** (`python tools/run_tests.py`), from the
 Blender-free core checks through the Blender renders to the headless game, including
 scenarios on a real **pak128**.
 

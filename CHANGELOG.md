@@ -1,5 +1,88 @@
 # Changelog
 
+## 0.10.0
+
+0.9 got you a family. This gets you a *train* — and puts the scene back afterwards.
+
+### The research that shaped it
+
+`can_follow` (`vehicle_desc.h:219`) decides all coupling, and everything falls out
+of one line: **`prev_veh == NULL` means "nothing in front of me" — the head.**
+
+| Written | `can_follow(NULL)` — at the head | `can_follow(X)` — behind X |
+|---|---|---|
+| *(nothing)* | true | true |
+| `none` | **true** (NULL==NULL) | false |
+| `any` | **false** (the `prev_veh!=NULL` guard) | **true** |
+
+So **`any` is how you say "middle only"** — the reverse of how the word reads.
+`vehicle_writer.cc:271` makes `none` a NULL child; `pakset_manager.cc:238` makes
+`any` a real sentinel. Full table in
+[docs/constraints-in-simutrans.md](docs/constraints-in-simutrans.md).
+
+### Added
+
+- **Consist Manager.** Describe the train; the coupling rules fall out. Handles
+  head/tail/middle-only, optional cars, repeatable sections (which may follow
+  **themselves** — forget that and "2 to 6 coaches" builds exactly one), reversible
+  sets and articulated pairs.
+
+  **The union is the point.** A vehicle in two formations must accept every
+  neighbour either gives it. Miss one and the game does not complain — it just
+  refuses to let the player build that train, and never says why.
+
+  `datgen` stays the canonical source: this generates the `constraint_prev` /
+  `constraint_next` tuples `vehicle_dat()` already took. It formats no `.dat` line,
+  and a test reads the AST to hold that.
+
+  **Show Constraints prints a diff and writes nothing.** A tool that silently
+  rewrites the coupling of every vehicle in a project is one nobody should press.
+
+  The summary refuses to invent: totals are `CONFIRMED`, `COMPUTED` or
+  `UNAVAILABLE`, and a weight missing two cars is unavailable rather than a sum
+  over the cars that happened to have figures.
+
+- **Eight-direction contact sheet.** Phase 2 proved one heading byte-identical to
+  the final render; all eight now are. It is an *extra* artefact built **from** the
+  finished frames — it never touches them. The order is the engine's own
+  (`s w sw se n e ne nw`), so the page is **labelled rather than reordered**.
+
+- **A real component catalogue** — wheelset, two-axle bogie, pantograph, headlight,
+  coupler. **Built, not committed as art**: `tools/build_components.py` defines each
+  as primitives, so the provenance *is* the source and the licence is unambiguous.
+  Real numbers (0.92 m wheels, 1.435 m gauge, UIC coupler height). No third-party
+  art.
+
+- **Schema v2**, one document holding variants and consists. The v1 → v2 migration
+  is tested against a **literal** phase-2 document, not one this code produced. A
+  document from the future is handed back untouched and never written over —
+  guessing at a newer format is how an old kit eats a newer project.
+
+### Fixed
+
+- **`Render All Variants` left the last variant applied.** An artist who rendered a
+  family found their scene painted in whichever livery came last, indistinguishable
+  from one they had painted themselves. `SceneRestore` now restores the material
+  slots, selection and active object whether the run finished, raised or was
+  cancelled — and **reports its own failures** as visible warnings.
+- **`addon/ui.py` said a lone `Constraint[Prev]=none` makes a vehicle "run
+  alone".** It means **only at the head**. `core/datgen.py` had it right in the same
+  repo, so the two contradicted each other and the wrong one was the tooltip. The
+  shipped Civia settles it: `cab_a` has `none` *and* a follower, and leads five cars.
+- **`core/datgen.py` described `any` as "anything at all"** — omitting that it
+  forbids the head.
+- The translation test demanded a translation for `""` (what `text=""` on an
+  icon-only button produces). An empty label is the absence of a word.
+
+### Not done
+
+- **No temporary variant preview**, and that is a decision. Applying a variant
+  rewrites material slots; Blender has no other way to assign a material, so there
+  is no honest "temporary" preview. Rather than simulate one, the panel says which
+  variant is on and offers one button to undo it.
+- **Blender 4.x: NOT TESTED.** Only 5.1.2 is on this machine.
+- **Linux and macOS: NOT TESTED.**
+
 ## 0.9.0
 
 0.8 got you a first object. This is about the second, the fifth, and shipping them.
