@@ -61,10 +61,20 @@ import sys
 
 import bpy
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
-    os.path.dirname(os.path.abspath(__file__)))))
+_PROJ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # assets/metro7k
+_ROOT = os.path.dirname(os.path.dirname(_PROJ))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
+
+# The brief, validated. Not the add-on's - see tools/spec.py, and note that the
+# zip builder refuses to ship anything that imports it: this is a fact about how WE
+# work, not a feature a stranger downloading a sprite tool should inherit.
+#
+# Loaded HERE, at import, because the numbers below come out of it. They used to be
+# literals in this file, where spec.py could not see them, and the split shipped
+# wrong once already. A number you cannot type twice cannot drift.
+from tools import spec as _spec                       # noqa: E402
+SPEC = _spec.load(os.path.join(_PROJ, "spec.json"))
 
 # Prefer the INSTALLED add-on when there is one. It matters: rig.DECLARED_SPECIAL
 # is module state, so if the geometry is built against the checkout's rig and the
@@ -193,20 +203,32 @@ class Car:
     train. The fix is the one pak128 itself uses - look at BR-373_FrontCar and
     BR-373_BackCar, or Thunder_(front_engine) and Thunder_(rear_engine): the tail
     car is a separate object, modelled facing the other way.
+
+    Every figure a car carries into the .dat is looked up in spec.json by this
+    car's key - seats, tonnes, kilowatts, its role, whether it has a cab, a
+    pantograph, or faces backwards. None of them is typed here, because a number
+    typed in two places is a number that will disagree with itself: this unit's
+    sibling shipped a payload split summing to 186 against a measured 178 while
+    spec.json plainly said 178, and nothing compared them.
+
+    What stays here is GEOMETRY - the door centres, and which length fact applies -
+    because that is what this file models. The lengths themselves are facts too, so
+    only their KEY is written here; the metres come from the spec.
     """
 
-    def __init__(self, key, name, metres, cab, panto, doors, seats, tonnes,
-                 kilowatts, reversed_=False):
+    def __init__(self, key, name, metres_fact, doors):
+        entry = SPEC.car(key)         # raises if the spec has never heard of it
         self.key = key
         self.name = name
-        self.metres = metres
-        self.cab = cab
-        self.panto = panto
+        self.metres = SPEC.value(metres_fact)
         self.doors = doors            # door centres, 0..1 along the car
-        self.seats = seats
-        self.tonnes = tonnes
-        self.kilowatts = kilowatts
-        self.reversed_ = reversed_
+        self.role = entry["role"]
+        self.cab = entry["cab"]
+        self.panto = entry["panto"]
+        self.reversed_ = entry["reversed"]
+        self.seats = entry["seats"]
+        self.tonnes = entry["tonnes"]
+        self.kilowatts = entry["kilowatts"]
 
     @property
     def length(self):
@@ -225,31 +247,22 @@ class Car:
 # the middle. Externally all four intermediates are identical; only the .dat tells a
 # motor (M, powered) from a trailer (R, unpowered).
 #
-# Every number below is split from a MEASURED total, and the split itself is the
-# approximation - AnsaldoBreda does not publish a per-car breakdown of anything.
-#   power     3168 kW = 198 kW x 16 motors, on the four motored cars (Mc, M). The
-#             "8 or 16 motors" ambiguity in the sources is resolved to 16, matching
-#             the 9000; spec.json records the conflict.
-#   capacity  payload is SEATED only (~178), matching the released 9000's convention.
-#             The real total is 1260; it lives in spec.json.
-#   weight    NOT PUBLISHED ANYWHERE. 200 t is a guess and spec.json says so.
+# The figures are NOT here. Every one of them - seats, tonnes, kilowatts, the
+# lengths, which cars have cabs and which faces backwards - is in spec.json, where
+# each carries its source and where car_totals makes the splits add up to the
+# sourced totals or refuses to load. What is left below is the modelling: the door
+# centres, and which length fact each car is built to.
+#
 # Four double doors per car, per side, which is what the photographs show.
 DOORS_6 = (0.16, 0.38, 0.62, 0.84)
 DOORS_CAB = (0.30, 0.50, 0.70, 0.88)     # the nose eats the first door bay
 
-CAB_A = Car("s7k_cab_a", "MadridMetro_S7000_CabA", 17.09, cab=True, panto=True,
-            doors=DOORS_CAB, seats=28, tonnes=37, kilowatts=792)
-REM_A = Car("s7k_rem_a", "MadridMetro_S7000_R1", 16.88, cab=False, panto=False,
-            doors=DOORS_6, seats=31, tonnes=28, kilowatts=0)     # trailer (R)
-MOT_A = Car("s7k_mot_a", "MadridMetro_S7000_M1", 16.88, cab=False, panto=False,
-            doors=DOORS_6, seats=30, tonnes=35, kilowatts=792)   # motor (M)
-MOT_B = Car("s7k_mot_b", "MadridMetro_S7000_M2", 16.88, cab=False, panto=False,
-            doors=DOORS_6, seats=30, tonnes=35, kilowatts=792)   # motor (M)
-REM_B = Car("s7k_rem_b", "MadridMetro_S7000_R2", 16.88, cab=False, panto=False,
-            doors=DOORS_6, seats=31, tonnes=28, kilowatts=0)     # trailer (R)
-CAB_B = Car("s7k_cab_b", "MadridMetro_S7000_CabB", 17.09, cab=True, panto=True,
-            doors=DOORS_CAB, seats=28, tonnes=37, kilowatts=792,
-            reversed_=True)          # the tail cab faces the other way. See Car.
+CAB_A = Car("s7k_cab_a", "MadridMetro_S7000_CabA", "length_cab_car_m", DOORS_CAB)
+REM_A = Car("s7k_rem_a", "MadridMetro_S7000_R1", "length_intermediate_m", DOORS_6)
+MOT_A = Car("s7k_mot_a", "MadridMetro_S7000_M1", "length_intermediate_m", DOORS_6)
+MOT_B = Car("s7k_mot_b", "MadridMetro_S7000_M2", "length_intermediate_m", DOORS_6)
+REM_B = Car("s7k_rem_b", "MadridMetro_S7000_R2", "length_intermediate_m", DOORS_6)
+CAB_B = Car("s7k_cab_b", "MadridMetro_S7000_CabB", "length_cab_car_m", DOORS_CAB)
 
 UNIT = (CAB_A, REM_A, MOT_A, MOT_B, REM_B, CAB_B)
 

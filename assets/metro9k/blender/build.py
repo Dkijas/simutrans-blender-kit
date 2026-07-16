@@ -131,26 +131,25 @@ def build_one(metro9k, car, constraints, install=True):
 
     # --- WHERE THE NUMBERS COME FROM, HONESTLY.
     #
-    # The unit-level figures below come from spec.load(), which has already refused
-    # anything without a source: that is why the table captioned "valor recomendado",
-    # whose capacity (1260) and per-car length (17.83 m, which is just 107/6) were
-    # wrong, could not reach the .dat through them.
+    # All of them come from spec.json, which has already refused anything without a
+    # source: that is why the table captioned "valor recomendado", whose capacity
+    # (1274) and per-car length (17.83 m, which is just 107/6) were wrong, could not
+    # reach the .dat through it.
     #
-    # The PER-CAR splits (power, weight, payload) do NOT come through the spec yet -
-    # they are literals in metro9k.py that spec.py never sees. That gap is real and it
-    # already cost us exactly once: this unit shipped a payload split summing to 186
-    # against a measured 178, and nothing caught it, because nothing was looking.
-    # build_all() now sums the split and checks it against the spec; routing the
-    # splits through spec.json per car is the proper fix and is still to do.
+    # The per-car figures reach it the same way. car.seats and friends are not
+    # literals any more - Car.__init__ looks each one up in the spec by the car's
+    # key, and the spec refuses to load unless the columns add up to their sourced
+    # totals. This unit shipped a split summing to 186 against a measured 178 back
+    # when these were typed in the module; that spec would not load today.
     spec = load_spec()
     p.waytype = "track"
     p.engine_type = "electric"
     p.speed = spec.value("speed")                  # measured
-    p.power = car.kilowatts                        # per-car split, NOT spec-gated
-    p.weight = car.tonnes                          # per-car split, NOT spec-gated
+    p.power = car.kilowatts                        # spec: cars[].kilowatts
+    p.weight = car.tonnes                          # spec: cars[].tonnes
     p.length = car.length
     p.freight = "Passagiere"
-    p.payload = car.seats                          # the SEATED figure only: 178 of 1274
+    p.payload = car.seats                          # spec: cars[].seats - SEATED only
     p.intro_year = spec.value("intro_year")        # measured
     p.cost = spec.value("cost") if car.cab else spec.value("cost") // 2   # PROVISIONAL
     p.runningcost = (spec.value("runningcost") if car.cab
@@ -247,25 +246,24 @@ def main():
         build_one(metro9k, car, cons)
 
     if which == "all":
-        # The per-car splits are literals in metro9k.py that spec.py never sees, so
-        # this is where they meet the sourced totals. The unit once shipped a payload
-        # summing to 186 against a measured 178 - a whole missing car's worth of seats
-        # - and nothing noticed, because nothing added them up. Now something does.
+        # The splits themselves are no longer checked here, and that is the point:
+        # they are in spec.json now, and spec.load() refuses to return a spec whose
+        # per-car columns do not add up to their sourced totals. This build got a
+        # spec at all, so the arithmetic already holds. The unit that shipped 186
+        # seats against a measured 178 could not load today.
+        #
+        # What the spec CANNOT see is this module: it could load a valid six-car
+        # spec and still build four of them. So that is what is checked here - the
+        # seam between the brief and the thing that renders it.
         spec = load_spec()
-        seated = spec.value("seated")
-        got = sum(c.seats for c in metro9k.UNIT)
-        check("the payload split sums to the measured seated figure", got == seated,
-              "spec says %d, the six cars carry %d" % (seated, got))
+        want = [c["key"] for c in spec.cars]
+        got = [c.key for c in metro9k.UNIT]
+        check("the module builds exactly the unit the spec describes, in order",
+              got == want, "spec: %s\n         module: %s" % (want, got))
 
-        watts = spec.value("power_total_kw")
-        got_kw = sum(c.kilowatts for c in metro9k.UNIT)
-        check("the power split sums to the derived total", got_kw == watts,
-              "spec says %d kW, the six cars carry %d kW" % (watts, got_kw))
-
-        tonnes = spec.value("weight_total_t")
-        got_t = sum(c.tonnes for c in metro9k.UNIT)
-        check("the weight split sums to the declared total", got_t == tonnes,
-              "spec says %d t, the six cars carry %d t" % (tonnes, got_t))
+        check("and their roles spell the declared formation",
+              "-".join(c.role for c in metro9k.UNIT) == spec.formation,
+              "%s vs %s" % ("-".join(c.role for c in metro9k.UNIT), spec.formation))
 
         # The art is victor_18993's. The kit used to write its own name here, and
         # the released MadridMetroS9000.pak still carries it.

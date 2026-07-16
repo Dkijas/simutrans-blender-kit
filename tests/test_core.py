@@ -1754,6 +1754,220 @@ def test_a_guess_is_allowed_but_never_silent():
         check("a nameless guess is refused", "WHY it is a guess" in str(e))
 
 
+def _unit(cars=None, **kw):
+    """A two-car spec that loads, so a test can break exactly one thing."""
+    base = {
+        "name": "T",
+        "facts": {"seated": {"value": 10, "kind": "measured",
+                             "source": "https://example.org/x"}},
+        "formation": "M-R",
+        "car_totals": {"seats": "seated"},
+        "cars": cars if cars is not None else [
+            {"key": "a", "role": "M", "cab": True, "panto": True,
+             "reversed": False, "seats": 6},
+            {"key": "b", "role": "R", "cab": False, "panto": False,
+             "reversed": True, "seats": 4},
+        ],
+    }
+    base.update(kw)
+    return base
+
+
+def _refused(what, data, expect):
+    try:
+        spec.Spec(data)
+        check(what, False, "it loaded")
+    except spec.SpecError as e:
+        check(what, expect in str(e), "wrong complaint: %s" % e)
+
+
+def test_a_split_that_does_not_add_up_does_not_reach_the_dat():
+    """The 186.
+
+    The 9000 shipped a payload split of 32+32+33+33+28+28 = 186 while its own
+    spec.json said, in writing, 178 - a whole car's worth of seats. Every check
+    passed. The .pak compiled. The game ran. Nothing was looking, because the
+    splits were literals in the module and the spec only ever guarded the totals.
+
+    This is that failure, reproduced in two cars: the spec says 10, the cars carry
+    11, and it must not load.
+    """
+    check("the honest unit loads", spec.Spec(_unit()).value("seated") == 10)
+
+    over = _unit(cars=[
+        {"key": "a", "role": "M", "cab": True, "panto": True, "reversed": False,
+         "seats": 7},
+        {"key": "b", "role": "R", "cab": False, "panto": False, "reversed": True,
+         "seats": 4},
+    ])
+    _refused("a split summing over its total is refused", over, "do not add up")
+
+    # ...and the mirror image, which is the same bug wearing the other sign
+    under = _unit(cars=[
+        {"key": "a", "role": "M", "cab": True, "panto": True, "reversed": False,
+         "seats": 1},
+        {"key": "b", "role": "R", "cab": False, "panto": False, "reversed": True,
+         "seats": 4},
+    ])
+    _refused("and so is one summing under it", under, "do not add up")
+
+    # the error has to be readable at 2am: it must quote both sides
+    try:
+        spec.Spec(over)
+    except spec.SpecError as e:
+        check("the complaint quotes the total, the sum, and the working",
+              "10" in str(e) and "11" in str(e) and "7 + 4" in str(e))
+
+
+def test_a_car_column_with_no_total_to_answer_to_is_refused():
+    """car_totals is the whole guard, so it cannot quietly name nothing."""
+    _refused("a column that adds up to a fact that does not exist is refused",
+             _unit(car_totals={"seats": "no_such_fact"}), "no such fact")
+
+    # a column every car is missing would otherwise sum to zero and "pass"
+    _refused("a column no car carries is refused",
+             _unit(car_totals={"tonnes": "seated"}), "every car has to carry one")
+
+    # and it can only add up something that IS a number
+    _refused("a column that is not numeric is refused",
+             _unit(car_totals={"role": "seated"}), "not one")
+
+
+def test_the_formation_pins_the_count_the_roles_and_the_order():
+    """One line that says what the train is, and three ways to contradict it."""
+    _refused("a unit with too few cars is refused",
+             _unit(formation="M-R-M"), "do not spell the declared formation")
+
+    _refused("a unit with the wrong role is refused",
+             _unit(formation="M-M"), "do not spell the declared formation")
+
+    # order matters: the same multiset of roles, reversed, is a different train
+    swapped = _unit(cars=[
+        {"key": "a", "role": "R", "cab": True, "panto": True, "reversed": False,
+         "seats": 6},
+        {"key": "b", "role": "M", "cab": False, "panto": False, "reversed": True,
+         "seats": 4},
+    ])
+    _refused("the right roles in the wrong order are refused", swapped,
+             "do not spell the declared formation")
+
+    _refused("and declaring a formation without giving the roles is refused",
+             _unit(cars=[{"key": "a", "cab": True, "panto": True,
+                          "reversed": False, "seats": 10}], formation="M"),
+             "has to say its role")
+
+
+def test_a_typo_in_a_car_is_refused_instead_of_ignored():
+    """Nothing read this array. A misspelt field was a number that never arrived."""
+    _refused("an unknown field is refused, by name",
+             _unit(cars=[{"key": "a", "role": "M", "cab": True, "panto": True,
+                          "reversed": False, "seats": 10, "sets": 3}]),
+             "'sets' is not a field a car has")
+
+    _refused("a missing required field is refused",
+             _unit(cars=[{"key": "a", "role": "M", "cab": True, "seats": 10}]),
+             "has to say 'panto'")
+
+    _refused("a car that is not an object is refused",
+             _unit(cars=["a"]), "write each car as an object")
+
+    _refused("and cars that are not a list at all",
+             _unit(cars={"key": "a"}), "must be a list")
+
+
+def test_two_cars_cannot_share_a_key():
+    """The key is what the .dat and the couplings are keyed on."""
+    _refused("a duplicate key is refused",
+             _unit(cars=[
+                 {"key": "a", "role": "M", "cab": True, "panto": True,
+                  "reversed": False, "seats": 5},
+                 {"key": "a", "role": "R", "cab": False, "panto": False,
+                  "reversed": True, "seats": 5},
+             ]), "two cars are both called")
+
+
+def test_a_car_figure_has_to_be_a_number_and_true_is_not_one():
+    """bool IS an int in Python, so `"seats": true` would have summed as one seat.
+
+    Not hypothetical arithmetic: sum([True, 4]) is 5. A spec whose seats were
+    true+4 against a total of 5 would load, and the .dat would carry a one-seat
+    car. The check has to reject bool BEFORE it asks whether it is an int.
+    """
+    check("python really does count True as one", sum([True, 4]) == 5)
+
+    _refused("so a boolean seat count is refused",
+             _unit(cars=[
+                 {"key": "a", "role": "M", "cab": True, "panto": True,
+                  "reversed": False, "seats": True},
+                 {"key": "b", "role": "R", "cab": False, "panto": False,
+                  "reversed": True, "seats": 9},
+             ]), "seats must be a whole number")
+
+    _refused("a fractional seat count is refused",
+             _unit(cars=[{"key": "a", "role": "M", "cab": True, "panto": True,
+                          "reversed": False, "seats": 10.0}]),
+             "seats must be a whole number")
+
+    _refused("a negative one is refused",
+             _unit(cars=[
+                 {"key": "a", "role": "M", "cab": True, "panto": True,
+                  "reversed": False, "seats": -1},
+                 {"key": "b", "role": "R", "cab": False, "panto": False,
+                  "reversed": True, "seats": 11},
+             ]), "seats cannot be negative")
+
+    # and the flags are flags, not truthy strings
+    _refused("a string where a flag belongs is refused",
+             _unit(cars=[{"key": "a", "role": "M", "cab": "yes", "panto": True,
+                          "reversed": False, "seats": 10}]),
+             "cab must be true or false")
+
+
+def test_asking_for_a_car_that_is_not_in_the_unit_is_an_error():
+    """Car.__init__ looks itself up by key, so a rename must fail loudly.
+
+    The 9000's spec named cab_a/int_r1/... for months after its module had renamed
+    them m9k_cab_a/m9k_int_r1/... Nothing read the array, so nothing minded. Now
+    the module reads it, and a stale key is a build that stops.
+    """
+    s = spec.Spec(_unit())
+    check("a car that exists comes back", s.car("a")["seats"] == 6)
+    try:
+        s.car("m9k_cab_a")
+        check("a car that does not is an error", False, "it returned something")
+    except spec.SpecError as e:
+        check("a car that does not is an error, and the message lists the unit",
+              "no car called" in str(e) and "a, b" in str(e))
+
+
+def test_both_madrid_metro_specs_guard_their_own_dat():
+    """The real files, not a fixture. If these two load, the splits add up."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for asset, total_key, formation in (("metro7k", "payload_seated", "Mc-R-M-M-R-Mc"),
+                                        ("metro9k", "seated", "M-R-S-S-R-M")):
+        s = spec.load(os.path.join(root, "assets", asset, "spec.json"))
+
+        check("%s: it loads, so every split meets its sourced total" % asset,
+              len(s.cars) == 6)
+        check("%s: it declares its formation" % asset, s.formation == formation)
+        check("%s: the roles spell it" % asset,
+              "-".join(c["role"] for c in s.cars) == formation)
+
+        # the figure this whole exercise is about
+        check("%s: the seats add up to the sourced %d" % (asset, s.value(total_key)),
+              sum(c["seats"] for c in s.cars) == s.value(total_key))
+        check("%s: and that figure is 178, not the 186 that shipped" % asset,
+              s.value(total_key) == 178)
+
+        check("%s: the power lands on the motored cars only" % asset,
+              sum(c["kilowatts"] for c in s.cars) == s.value("power_total_kw"))
+        check("%s: the weight adds up" % asset,
+              sum(c["tonnes"] for c in s.cars) == s.value("weight_total_t"))
+        check("%s: one cab at each end, and the tail one is turned around" % asset,
+              [c["cab"] for c in s.cars] == [True, False, False, False, False, True]
+              and s.cars[-1]["reversed"] is True)
+
+
 def test_the_civia_spec_is_real_and_every_number_defensible():
     path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                         "assets", "civia_465", "spec.json")

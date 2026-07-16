@@ -35,6 +35,23 @@ and a fifth, which is allowed but never silent:
 Anything else - "chatgpt", "ai", "the image", "obvious", "" - is refused, with the
 Civia's four wrong numbers quoted back at you.
 
+AND THE SAME RULE FOR THE SPLITS
+
+A six-car unit's .dat does not carry "178 seats", it carries six numbers that had
+better add up to 178. Those per-car splits used to be literals in the asset's
+Python, where spec.py never saw them - so the rule above guarded the totals and
+nothing at all guarded the arithmetic under them. The 9000 shipped a payload split
+summing to 186 against a measured 178, a whole car's worth of seats, and every
+check passed, because nothing added them up.
+
+So the cars live here too, and `car_totals` names the fact each column must sum to:
+
+    "formation":  "Mc-R-M-M-R-Mc"          the shape: count, roles and order
+    "car_totals": {"seats": "payload_seated", ...}   this column adds up to that fact
+    "cars":       [{"key": ..., "seats": 28, ...}, ...]   in running order
+
+A split that does not sum to its sourced total is not a spec, it is a rumour.
+
 WHY THIS LIVES IN tools/ AND NOT IN core/
 
 Because everything in core/ is shipped: tools/build_addon_zip.py packs `addon` and
@@ -127,6 +144,53 @@ def _check_source(key, kind, source, formula):
                         "workings are lost is a guess wearing a lab coat." % key)
 
 
+# What a car entry is allowed to say. Anything else is a typo, and a typo here used
+# to be silent: the `cars` array was read by nobody, so a misspelt field, a stale
+# key or a wrong number sat in the file looking authoritative for months.
+#
+# bool and int are listed separately on purpose. In Python bool IS an int -
+# isinstance(True, int) is True - so a field checked only for int-ness would accept
+# "seats": true and add it up as one seat.
+_CAR_TYPES = {
+    "key": str,          # what the .dat and the couplings are keyed on
+    "role": str,         # its letter in the formation
+    "name": str,
+    "cab": bool,
+    "panto": bool,
+    "reversed": bool,
+    "seats": int,
+    "tonnes": int,
+    "kilowatts": int,
+    "note": str,
+}
+_CAR_REQUIRED = ("key", "cab", "panto", "reversed")
+
+
+def _check_car_field(where, field, value):
+    want = _CAR_TYPES.get(field)
+    if want is None:
+        raise SpecError(
+            "%s: %r is not a field a car has. The known ones are: %s.\n"
+            "  Nothing used to read this array, so a misspelt field was simply a "
+            "number that never reached the .dat, silently."
+            % (where, field, ", ".join(sorted(_CAR_TYPES))))
+
+    if want is bool:
+        if not isinstance(value, bool):
+            raise SpecError("%s: %s must be true or false, not %r"
+                            % (where, field, value))
+    elif want is int:
+        # bool first: see _CAR_TYPES. "seats": true must not count as one seat.
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise SpecError("%s: %s must be a whole number, not %r"
+                            % (where, field, value))
+        if value < 0:
+            raise SpecError("%s: %s cannot be negative (%r)" % (where, field, value))
+    elif not isinstance(value, str) or not value.strip():
+        raise SpecError("%s: %s must be a non-empty string, not %r"
+                        % (where, field, value))
+
+
 class Spec:
     """The brief. spec.value('speed') gives you a number you can defend."""
 
@@ -149,7 +213,93 @@ class Spec:
             self.facts[key] = Fact(key, raw["value"], kind, raw.get("source"),
                                    raw.get("formula"), raw.get("note"))
 
+        # The unit, in running order. Until now this array was decorative: nothing
+        # read it and nothing checked it, which is why the 9000's entries still
+        # named cars ("cab_a") that its own module had long since renamed
+        # ("m9k_cab_a"), and why a payload split summing to 186 against a measured
+        # 178 could ship. Both are load-bearing now.
+        self.formation = data.get("formation")
+        self.car_totals = data.get("car_totals") or {}
         self.cars = data.get("cars") or []
+        self._check_cars()
+
+    def _check_cars(self):
+        if not isinstance(self.cars, list):
+            raise SpecError("%s: 'cars' must be a list, in running order" % self.name)
+
+        seen = {}
+        for i, car in enumerate(self.cars):
+            where = "%s car %d" % (self.name, i + 1)
+            if not isinstance(car, dict):
+                raise SpecError("%s: write each car as an object, not %r"
+                                % (where, car))
+            for field, value in car.items():
+                _check_car_field(where, field, value)
+            for field in _CAR_REQUIRED:
+                if field not in car:
+                    raise SpecError("%s: every car has to say %r" % (where, field))
+            key = car["key"]
+            if key in seen:
+                raise SpecError(
+                    "%s: two cars are both called %r (this one and car %d). The key "
+                    "is what the .dat and the couplings are keyed on, so a duplicate "
+                    "is one car overwriting the other." % (where, key, seen[key] + 1))
+            seen[key] = i
+
+        # The formation is the unit's shape written down once. Checking the roles
+        # against it checks the car COUNT, the roles themselves and their ORDER in
+        # one go - and it is the only place that states what the train actually is.
+        if self.formation:
+            want = [r.strip() for r in self.formation.split("-")]
+            got = [c.get("role") for c in self.cars]
+            if None in got:
+                raise SpecError("%s declares the formation %s, so every car has to "
+                                "say its role" % (self.name, self.formation))
+            if got != want:
+                raise SpecError(
+                    "%s: the cars do not spell the declared formation.\n"
+                    "  formation: %-24s (%d cars)\n"
+                    "  the cars:  %-24s (%d cars)"
+                    % (self.name, "-".join(want), len(want),
+                       "-".join(got), len(got)))
+
+        # And the per-car figures meet the sourced totals. This is the whole point:
+        # a split is arithmetic over a fact, so it inherits that fact's source - or
+        # it is a number nobody can defend, wearing the total's authority.
+        for column, fact_key in sorted(self.car_totals.items()):
+            if _CAR_TYPES.get(column) is not int:
+                raise SpecError("%s: car_totals can only add up a numeric car "
+                                "field, and %r is not one" % (self.name, column))
+            if fact_key not in self.facts:
+                raise SpecError(
+                    "%s: car_totals says the %s add up to %r, but there is no such "
+                    "fact to check them against." % (self.name, column, fact_key))
+            missing = [c["key"] for c in self.cars if column not in c]
+            if missing:
+                raise SpecError("%s: car_totals adds up the %s, so every car has to "
+                                "carry one. These do not: %s"
+                                % (self.name, column, ", ".join(missing)))
+            total = sum(c[column] for c in self.cars)
+            fact = self.facts[fact_key]
+            if total != fact.value:
+                raise SpecError(
+                    "%s: the per-car %s do not add up to %s.\n"
+                    "  %s says %s (%s)\n"
+                    "  the %d cars carry %s: %s\n"
+                    "  A split that does not sum to its total is exactly how the "
+                    "9000 shipped 186 seats against a measured 178."
+                    % (self.name, column, fact_key, fact_key, fact.value, fact.kind,
+                       len(self.cars), total,
+                       " + ".join(str(c[column]) for c in self.cars)))
+
+    def car(self, key):
+        """One car's entry, by the key the .dat is built under."""
+        for car in self.cars:
+            if car["key"] == key:
+                return car
+        raise SpecError("%s: no car called %r. The unit is: %s"
+                        % (self.name, key,
+                           ", ".join(c["key"] for c in self.cars) or "(empty)"))
 
     def value(self, key, default=None):
         fact = self.facts.get(key)

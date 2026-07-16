@@ -29,6 +29,10 @@ alone: only `CabA` may lead, only `CabB` may trail, and neither may do both.
 
 Every figure in `spec.json` carries its `kind` and its source, and `tools/spec.py`
 refuses a number whose source is missing or is a word like "guess" or "chatgpt".
+The per-car table above is in there too, not in the Python: `car_totals` names the
+fact each column must add up to, and a split that does not sum to its sourced total
+refuses to load. That check exists because the 9000 shipped one that summed to 186
+against a measured 178 back when these numbers were typed in the module.
 
 **Measured** (es.wikipedia.org "Series 7000 y 9000"; vialibre-ffe.com's 7000 ficha):
 speed 110 km/h, cab car 17.09 m, intermediates 16.88 m, width 2.8 m, height
@@ -97,10 +101,12 @@ this repository.
 ## Known limitations
 
 - No reference photograph here; nose colour and pantograph unconfirmed (above).
-- The per-car splits of power, weight and payload are literals in `metro7k.py`,
-  not spec facts — `spec.py` never sees them. `build.py` now sums them against the
-  sourced totals, which is the guard that catches a wrong split, but routing them
-  through `spec.json` per car is the proper fix and is still to do.
+- The per-car splits of power, weight and payload are *our* arithmetic over the
+  sourced totals — AnsaldoBreda publishes no per-car breakdown of anything. They
+  live in `spec.json`'s `cars` array, and `car_totals` makes each column add up to
+  the fact it names or the spec refuses to load, so a wrong split cannot build.
+  What the check cannot tell you is whether the split is the *right* one: it only
+  knows it sums correctly.
 - `reports/` and `renders/` are empty: `build.py` creates them and never writes
   them. Inherited from the asset this one was copied from.
 - The `.blend` files are outputs, not inputs — the geometry is procedural and

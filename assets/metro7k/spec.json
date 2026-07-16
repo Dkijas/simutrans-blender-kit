@@ -139,12 +139,30 @@
     "note": "No 7000 reference photograph in the repo yet. The livery layout (ivory with a high blue band) and the cab shape are shared with the 9000; the RED door band comes from the sources' description of the 9000-vs-7000 difference. Confirm the front colour and pantograph position against a photo before release."
   },
 
+  "formation": "Mc-R-M-M-R-Mc",
+
+  "_splits": [
+    "AnsaldoBreda publishes no per-car breakdown of anything, so every split below",
+    "is OUR arithmetic over a sourced total, and car_totals is what forces it to",
+    "stay arithmetic: each column must add up to the fact it names, or nothing",
+    "builds. The seats are the 9000's split, unchanged - same carbody, so the two",
+    "units agree seat for seat when parked side by side. Power sits on the four",
+    "motored cars (Mc, M); the trailers (R) carry none, which is what makes them",
+    "trailers."
+  ],
+
+  "car_totals": {
+    "seats": "payload_seated",
+    "kilowatts": "power_total_kw",
+    "tonnes": "weight_total_t"
+  },
+
   "cars": [
-    {"key": "s7k_cab_a", "role": "Mc", "cab": true,  "panto": true,  "reversed": false},
-    {"key": "s7k_rem_a", "role": "R",  "cab": false, "panto": false, "reversed": false},
-    {"key": "s7k_mot_a", "role": "M",  "cab": false, "panto": false, "reversed": false},
-    {"key": "s7k_mot_b", "role": "M",  "cab": false, "panto": false, "reversed": false},
-    {"key": "s7k_rem_b", "role": "R",  "cab": false, "panto": false, "reversed": false},
-    {"key": "s7k_cab_b", "role": "Mc", "cab": true,  "panto": true,  "reversed": true}
+    {"key": "s7k_cab_a", "role": "Mc", "cab": true,  "panto": true,  "reversed": false, "seats": 28, "tonnes": 37, "kilowatts": 792},
+    {"key": "s7k_rem_a", "role": "R",  "cab": false, "panto": false, "reversed": false, "seats": 31, "tonnes": 28, "kilowatts": 0},
+    {"key": "s7k_mot_a", "role": "M",  "cab": false, "panto": false, "reversed": false, "seats": 30, "tonnes": 35, "kilowatts": 792},
+    {"key": "s7k_mot_b", "role": "M",  "cab": false, "panto": false, "reversed": false, "seats": 30, "tonnes": 35, "kilowatts": 792},
+    {"key": "s7k_rem_b", "role": "R",  "cab": false, "panto": false, "reversed": false, "seats": 31, "tonnes": 28, "kilowatts": 0},
+    {"key": "s7k_cab_b", "role": "Mc", "cab": true,  "panto": true,  "reversed": true,  "seats": 28, "tonnes": 37, "kilowatts": 792}
   ]
 }

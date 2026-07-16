@@ -128,17 +128,37 @@
   },
 
   "reference": {
-    "cab": "references/cab.png",
-    "intermediate": "references/intermediate.png",
-    "note": "generated side elevations. NOT orthographic (the camera sits slightly above - the top face of the roof is visible) and NOT flat-shaded, so use them for PROPORTIONS and take absolute sizes from the facts above."
+    "photos": ["references/real_serie9000_1.jpg", "references/real_canal_9004.jpg", "references/real_plaza_castilla.jpg"],
+    "note": "photographs of the real train, used for the livery layout and proportions; absolute sizes come from the facts above, never from a pixel. They are NOT in the repository - see .gitignore: we do not own them. This block used to name references/cab.png and references/intermediate.png, 'generated side elevations' that are not in this folder and, on the evidence of the Civia, should never have been cited as a source anyway."
+  },
+
+  "formation": "M-R-S-S-R-M",
+
+  "_splits": [
+    "AnsaldoBreda publishes no per-car breakdown of anything, so every split below",
+    "is OUR arithmetic over a sourced total, and car_totals is what forces it to",
+    "stay arithmetic: each column must add up to the fact it names, or nothing",
+    "builds. This unit is why that check exists - it shipped a payload split",
+    "summing to 186 against the measured 178 and nothing noticed, because nothing",
+    "added them up. The seats are now the 7000's already-published split: same",
+    "carbody, so the two agree seat for seat. Power sits on the motored cars (M,",
+    "R); the S trailers carry none, which is what makes them trailers.",
+    "The keys below used to read cab_a/int_r1/... - names this asset's own module",
+    "had long since dropped. Nothing read the array, so nothing minded."
+  ],
+
+  "car_totals": {
+    "seats": "seated",
+    "kilowatts": "power_total_kw",
+    "tonnes": "weight_total_t"
   },
 
   "cars": [
-    {"key": "cab_a",  "role": "M", "cab": true,  "panto": true,  "reversed": false},
-    {"key": "int_r1", "role": "R", "cab": false, "panto": false, "reversed": false},
-    {"key": "int_s1", "role": "S", "cab": false, "panto": false, "reversed": false},
-    {"key": "int_s2", "role": "S", "cab": false, "panto": false, "reversed": false},
-    {"key": "int_r2", "role": "R", "cab": false, "panto": false, "reversed": false},
-    {"key": "cab_b",  "role": "M", "cab": true,  "panto": true,  "reversed": true}
+    {"key": "m9k_cab_a",  "role": "M", "cab": true,  "panto": true,  "reversed": false, "seats": 28, "tonnes": 38, "kilowatts": 792},
+    {"key": "m9k_int_r1", "role": "R", "cab": false, "panto": false, "reversed": false, "seats": 30, "tonnes": 33, "kilowatts": 792},
+    {"key": "m9k_int_s1", "role": "S", "cab": false, "panto": false, "reversed": false, "seats": 31, "tonnes": 29, "kilowatts": 0},
+    {"key": "m9k_int_s2", "role": "S", "cab": false, "panto": false, "reversed": false, "seats": 31, "tonnes": 29, "kilowatts": 0},
+    {"key": "m9k_int_r2", "role": "R", "cab": false, "panto": false, "reversed": false, "seats": 30, "tonnes": 33, "kilowatts": 792},
+    {"key": "m9k_cab_b",  "role": "M", "cab": true,  "panto": true,  "reversed": true,  "seats": 28, "tonnes": 38, "kilowatts": 792}
   ]
 }
