@@ -25,11 +25,13 @@ from bpy.props import (BoolProperty, EnumProperty, FloatVectorProperty,
 from bpy.types import Operator, Panel, PropertyGroup
 
 try:
-    from . import rig, translations
-    from ..core import buildings, colors, factories, night, paksets, schema, sheet
+    from . import rig, template, translations
+    from ..core import (buildings, colors, factories, night, paksets, scenecheck,
+                        schema, sheet, templates)
 except ImportError:                                   # running from a checkout
-    from addon import rig, translations
-    from core import buildings, colors, factories, night, paksets, schema, sheet
+    from addon import rig, template, translations
+    from core import (buildings, colors, factories, night, paksets, scenecheck,
+                      schema, sheet, templates)
 
 CTX = translations.CONTEXT
 
@@ -310,6 +312,36 @@ class SimutransProps(PropertyGroup):
         size=3, min=0.0, max=1.0, default=(0.5, 0.5, 0.5),
         description="The colour for Plain paint. The reserved materials above ignore "
                     "it - their colour is fixed by the engine",
+    )
+
+    # --- reference photos.
+    #
+    # The real thing's measurements, so a photo can be scaled to the size the
+    # model has to end up. Metres, because that is what a spec sheet gives you.
+    ref_image: StringProperty(
+        name="Image", translation_context=CTX, subtype="FILE_PATH", default="",
+        description="A photo or drawing already on your disk. Nothing is "
+                    "downloaded",
+    )
+    ref_side: EnumProperty(
+        name="View", translation_context=CTX,
+        items=[("side", "Side", "seen from the left - length along +X"),
+               ("front", "Front", "seen from the nose - width across"),
+               ("top", "Top", "seen from above")],
+        default="side",
+    )
+    ref_length_m: FloatVectorProperty(
+        name="Real size (m)", translation_context=CTX, size=3,
+        default=(20.0, 3.0, 4.0), min=0.01, subtype="XYZ",
+        description="The REAL length, width and height in metres. The photo is "
+                    "scaled to these, so a model traced over it comes out the "
+                    "right size",
+    )
+    metres_per_tile: IntProperty(
+        name="Metres per tile", translation_context=CTX, default=40, min=1,
+        description="How many metres of the world one tile is. The engine has NO "
+                    "metres - this is the pakset's own convention, and pak128's "
+                    "is roughly 40",
     )
 
 
@@ -641,6 +673,105 @@ class SIMUTRANS_OT_build_rig(Operator):
         pak = rig.build_rig(bpy, p.pakset)
         self.report({"INFO"}, _("%s rig: %d px, ortho_scale %.4f")
                     % (pak.name, pak.tile_px, pak.ortho_scale))
+        return {"FINISHED"}
+
+
+def _template_opts(p):
+    """The panel's numbers, in the words core.templates uses."""
+    return dict(seasons=p.seasons, phases=p.phases, states=p.states,
+                freight_variants=len(_names(p.freight_goods)))
+
+
+class SIMUTRANS_OT_create_template(Operator):
+    bl_idname = "simutrans.create_template"
+    bl_label = "Create Template"
+    bl_translation_context = CTX
+    bl_description = ("Make the collections this object needs, named the way the "
+                      "renderer reads them, and the guides that show which way is "
+                      "forward and how big a tile is. Safe to press again")
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        made, kept, guides = template.create(
+            bpy, p.obj_type, p.pakset, length=p.length, size_x=p.size_x,
+            size_y=p.size_y, **_template_opts(p))
+
+        if made:
+            say(self, {"INFO"}, _("%d collection(s): %s")
+                % (len(made), ", ".join(made)))
+        if kept:
+            # Said out loud, because "nothing happened" is what a second press
+            # looks like otherwise, and an artist who cannot tell "already there"
+            # from "broken" presses it a third time.
+            say(self, {"INFO"}, _("%d already there, left alone") % len(kept))
+        if not made and not kept:
+            say(self, {"INFO"},
+                _("A %s needs no collections - the guides are the template")
+                % p.obj_type)
+        say(self, {"INFO"}, _("%d guide(s) - they never render") % len(guides))
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_setup_reference(Operator):
+    bl_idname = "simutrans.setup_reference"
+    bl_label = "Place Reference"
+    bl_translation_context = CTX
+    bl_description = ("Put a photo where the model goes, scaled from the real "
+                      "measurements you typed. Nothing is downloaded")
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        path = bpy.path.abspath(p.ref_image) if p.ref_image else ""
+        if not path:
+            say(self, {"ERROR"}, _("Pick a reference image first"))
+            return {"CANCELLED"}
+        try:
+            ob = template.setup_reference(
+                bpy, p.ref_side, path,
+                length_m=p.ref_length_m[0], width_m=p.ref_length_m[1],
+                height_m=p.ref_length_m[2], pakset_name=p.pakset,
+                metres_per_tile=p.metres_per_tile)
+        except (ValueError, RuntimeError) as e:
+            say(self, {"ERROR"}, str(e))
+            return {"CANCELLED"}
+        if ob is None:
+            say(self, {"ERROR"},
+                _("There is already an object with that name and it is not a "
+                  "reference. Rename it first - I will not delete your work"))
+            return {"CANCELLED"}
+        say(self, {"INFO"}, _("%s placed, %d m per tile")
+            % (ob.name, p.metres_per_tile))
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_validate(Operator):
+    bl_idname = "simutrans.validate"
+    bl_label = "Validate"
+    bl_translation_context = CTX
+    bl_description = ("Check the scene BEFORE rendering it: the collections, the "
+                      "ground, the origin, the size and the numbers. An error "
+                      "stops the render; a warning does not")
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        findings = scenecheck.check(template.describe(bpy, p, rig))
+
+        for f in findings:
+            level = {scenecheck.ERROR: "ERROR",
+                     scenecheck.WARNING: "WARNING"}.get(f.level, "INFO")
+            say(self, {level}, "%s: %s" % (f.code, _(f.message)))
+
+        errors = scenecheck.blocking(findings)
+        if errors:
+            say(self, {"ERROR"}, _("%d error(s) - fix these before rendering")
+                % len(errors))
+        elif len(findings) > 1:
+            say(self, {"INFO"}, _("No errors. %d thing(s) to look at")
+                % (len(findings) - 1))
+        else:
+            say(self, {"INFO"}, _("Nothing wrong that I can see from here"))
         return {"FINISHED"}
 
 
@@ -1055,8 +1186,12 @@ class SIMUTRANS_PT_panel(Panel):
         pak = paksets.get(p.pakset)
         col = self.layout.column()
 
+        # START. What you are making, then the two buttons that make a scene to
+        # make it in. This box used to be called "Rig" and open with the camera,
+        # which is the second thing an artist needs and the first thing the kit
+        # offered - there was no first thing.
         box = col.box()
-        box.label(text="Rig", icon="CAMERA_DATA", text_ctxt=CTX)
+        box.label(text="Start", icon="ADD", text_ctxt=CTX)
         box.prop(p, "pakset")
         box.prop(p, "obj_type")
         box.label(text=_("%d px, ortho_scale %.4f")
@@ -1068,6 +1203,7 @@ class SIMUTRANS_PT_panel(Panel):
         for line in _MODEL_HINT[p.obj_type]:
             box.label(text=line, icon="INFO" if line is _MODEL_HINT[p.obj_type][0]
                       else "NONE", text_ctxt=CTX)
+        box.operator("simutrans.create_template", icon="OUTLINER_COLLECTION")
         box.operator("simutrans.build_rig", icon="OUTLINER_OB_CAMERA")
 
         box = col.box()
@@ -1096,6 +1232,12 @@ class SIMUTRANS_PT_panel(Panel):
 
         acts = box.column()
         acts.enabled = out is not None
+        # Validate sits ABOVE Render deliberately: it is the cheap step, and it is
+        # the one that answers "is this worth rendering?". It does not need the
+        # output path, so it stays enabled when the rest of the box is greyed out -
+        # an unsaved .blend is one of the things it exists to tell you about.
+        val = box.column()
+        val.operator("simutrans.validate", icon="CHECKMARK")
         acts.operator("simutrans.render_sheet", icon="RENDER_ANIMATION")
         acts.operator("simutrans.write_dat", icon="FILE_TEXT")
         acts.operator("simutrans.check_colors", icon="COLOR")
@@ -1171,10 +1313,37 @@ class SIMUTRANS_PT_dat(Panel):
             warn.label(text="State 0 is RED.", text_ctxt=CTX)
 
 
-CLASSES = (SimutransProps, SIMUTRANS_OT_build_rig, SIMUTRANS_OT_render_sheet,
+class SIMUTRANS_PT_reference(Panel):
+    """Reference photos. A sub-panel, closed by default, because an artist who
+    has no photo should not have to scroll past six fields to reach Render."""
+    bl_label = "Reference photos"
+    bl_translation_context = CTX
+    bl_idname = "SIMUTRANS_PT_reference"
+    bl_parent_id = "SIMUTRANS_PT_panel"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Simutrans"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    def draw(self, context):
+        p = context.scene.simutrans
+        col = self.layout.column()
+        col.prop(p, "ref_image")
+        col.prop(p, "ref_side")
+        col.prop(p, "ref_length_m")
+        col.prop(p, "metres_per_tile")
+        act = col.column()
+        act.enabled = bool(p.ref_image)
+        act.operator("simutrans.setup_reference", icon="IMAGE_REFERENCE")
+
+
+CLASSES = (SimutransProps, SIMUTRANS_OT_build_rig, SIMUTRANS_OT_create_template,
+           SIMUTRANS_OT_setup_reference, SIMUTRANS_OT_validate,
+           SIMUTRANS_OT_render_sheet,
            SIMUTRANS_OT_write_dat, SIMUTRANS_OT_check_colors,
            SIMUTRANS_OT_night_preview, SIMUTRANS_OT_apply_material,
-           SIMUTRANS_OT_compile_pak, SIMUTRANS_PT_panel, SIMUTRANS_PT_dat)
+           SIMUTRANS_OT_compile_pak, SIMUTRANS_PT_panel, SIMUTRANS_PT_dat,
+           SIMUTRANS_PT_reference)
 
 
 _TRANSLATION_DOMAIN = "simutrans_blender_kit"

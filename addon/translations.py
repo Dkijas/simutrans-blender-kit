@@ -41,12 +41,48 @@ CONTEXT = "SimutransKit"
 # code actually uses, so it cannot drift.
 SOURCE_STRINGS = (
     # panels
-    "Rig",
+    "Start",
     "Output",
     "Object (.dat)",
+    "Reference photos",
     "%d px, ortho_scale %.4f",
     "Save the .blend, or use an",
     "absolute Output path",
+    # --- starting a scene: the collections and guides an artist would otherwise
+    # have to make, and name, by hand
+    "Create Template",
+    "Make the collections this object needs, named the way the renderer reads "
+    "them, and the guides that show which way is forward and how big a tile is. "
+    "Safe to press again",
+    "%d collection(s): %s",
+    "%d already there, left alone",
+    "A %s needs no collections - the guides are the template",
+    "%d guide(s) - they never render",
+    # --- reference photos
+    "Image",
+    "A photo or drawing already on your disk. Nothing is downloaded",
+    "View",
+    "Real size (m)",
+    "The REAL length, width and height in metres. The photo is scaled to these, "
+    "so a model traced over it comes out the right size",
+    "Metres per tile",
+    "How many metres of the world one tile is. The engine has NO metres - this "
+    "is the pakset's own convention, and pak128's is roughly 40",
+    "Place Reference",
+    "Put a photo where the model goes, scaled from the real measurements you "
+    "typed. Nothing is downloaded",
+    "Pick a reference image first",
+    "There is already an object with that name and it is not a reference. "
+    "Rename it first - I will not delete your work",
+    "%s placed, %d m per tile",
+    # --- validating before the render, not after it
+    "Validate",
+    "Check the scene BEFORE rendering it: the collections, the ground, the "
+    "origin, the size and the numbers. An error stops the render; a warning "
+    "does not",
+    "%d error(s) - fix these before rendering",
+    "No errors. %d thing(s) to look at",
+    "Nothing wrong that I can see from here",
     # operators
     "Build Rig",
     "Create the Simutrans camera and sun and set the render options this pakset needs",
@@ -285,12 +321,70 @@ SOURCE_STRINGS = (
 
 SPANISH = {
     # panels
-    "Rig": "Rig",
+    "Start": "Empezar",
     "Output": "Salida",
     "Object (.dat)": "Objeto (.dat)",
+    "Reference photos": "Fotos de referencia",
     "%d px, ortho_scale %.4f": "%d px, ortho_scale %.4f",
     "Save the .blend, or use an": "Guarda el .blend, o usa una",
     "absolute Output path": "ruta de salida absoluta",
+
+    # --- empezar una escena
+    "Create Template": "Crear plantilla",
+    "Make the collections this object needs, named the way the renderer reads "
+    "them, and the guides that show which way is forward and how big a tile is. "
+    "Safe to press again":
+        "Crea las colecciones que este objeto necesita, con los nombres exactos "
+        "que lee el renderizador, y las guías que muestran hacia dónde va la "
+        "parte delantera y cuánto mide una casilla. Puedes pulsarlo otra vez sin "
+        "riesgo",
+    "%d collection(s): %s": "%d colección(es): %s",
+    "%d already there, left alone": "%d ya estaban; no las he tocado",
+    "A %s needs no collections - the guides are the template":
+        "Un %s no necesita colecciones: la plantilla son las guías",
+    "%d guide(s) - they never render": "%d guía(s); nunca se renderizan",
+
+    # --- fotos de referencia
+    "Image": "Imagen",
+    "A photo or drawing already on your disk. Nothing is downloaded":
+        "Una foto o un plano que ya tengas en tu disco. No se descarga nada",
+    "View": "Vista",
+    "Real size (m)": "Tamaño real (m)",
+    "The REAL length, width and height in metres. The photo is scaled to these, "
+    "so a model traced over it comes out the right size":
+        "La longitud, anchura y altura REALES en metros. La foto se escala a "
+        "estas medidas, así que un modelo calcado sobre ella sale del tamaño "
+        "correcto",
+    "Metres per tile": "Metros por casilla",
+    "How many metres of the world one tile is. The engine has NO metres - this "
+    "is the pakset's own convention, and pak128's is roughly 40":
+        "Cuántos metros del mundo vale una casilla. El motor NO tiene metros: "
+        "es una convención del propio pakset, y la de pak128 son unos 40",
+    "Place Reference": "Colocar referencia",
+    "Put a photo where the model goes, scaled from the real measurements you "
+    "typed. Nothing is downloaded":
+        "Coloca una foto donde irá el modelo, escalada según las medidas reales "
+        "que has escrito. No se descarga nada",
+    "Pick a reference image first": "Elige primero una imagen de referencia",
+    "There is already an object with that name and it is not a reference. "
+    "Rename it first - I will not delete your work":
+        "Ya hay un objeto con ese nombre y no es una referencia. Renómbralo "
+        "primero: no voy a borrar tu trabajo",
+    "%s placed, %d m per tile": "%s colocada, %d m por casilla",
+
+    # --- validar antes de renderizar, no después
+    "Validate": "Validar",
+    "Check the scene BEFORE rendering it: the collections, the ground, the "
+    "origin, the size and the numbers. An error stops the render; a warning "
+    "does not":
+        "Comprueba la escena ANTES de renderizarla: las colecciones, el suelo, "
+        "el origen, el tamaño y los números. Un error detiene el render; un "
+        "aviso no",
+    "%d error(s) - fix these before rendering":
+        "%d error(es): corrígelos antes de renderizar",
+    "No errors. %d thing(s) to look at": "Sin errores. %d cosa(s) que mirar",
+    "Nothing wrong that I can see from here":
+        "Nada mal, hasta donde puedo ver desde aquí",
     # operators
     "Build Rig": "Montar rig",
     "Create the Simutrans camera and sun and set the render options this pakset needs":

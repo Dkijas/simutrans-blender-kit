@@ -368,6 +368,11 @@ def suite_blender_footprint():
     return _blender("blender_footprint.py", "FOOTPRINT_OK")
 
 
+def suite_blender_template():
+    """Create Template and Validate: the collections, the guides, twice over."""
+    return _blender("blender_template.py", "TEMPLATE_OK")
+
+
 def suite_blender_way():
     """A way: six models turned into sixteen ribi images, checked pixel by pixel."""
     return _blender("blender_way.py", "WAY_OK")
@@ -503,6 +508,7 @@ SUITES = {
     "schema": suite_schema,
     "colours": suite_colours,
     "profile": suite_profile,
+    "template": suite_blender_template,
     "e2e": suite_blender_e2e,
     "alignment": suite_blender_alignment,
     "building": suite_blender_building,
@@ -538,7 +544,9 @@ SUITES = {
 # Producers first, then the .pak they feed, then the game. The order IS the loop:
 # nothing downstream of "paks" can pass on art that this run did not render.
 ORDER = ("core", "templates", "scenecheck", "schema", "colours", "profile",
-         # producers: the art and the .dat
+         # producers: the art and the .dat. "template" leads them - it is what
+         # makes the scene the rest of them render.
+         "template",
          "e2e", "alignment", "building", "footprint", "way", "freight", "tunnel",
          "bridge", "infra", "addon", "panel", "demo-all", "demo-loco",
          # the .pak the game will load, compiled from what was just rendered
