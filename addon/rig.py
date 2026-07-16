@@ -23,14 +23,14 @@ import sys
 try:
     # installed in Blender: we are <addon-package>.addon.rig
     from ..core import (bridges, buildings, colors, datgen, directions, paksets,
-                        projection, roadsigns, sheet, tunnels, ways)
+                        projection, roadsigns, sheet, templates, tunnels, ways)
 except ImportError:
     # run straight from a checkout (the tests, and `blender --python ...`)
     _HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if _HERE not in sys.path:
         sys.path.insert(0, _HERE)
     from core import (bridges, buildings, colors, datgen, directions, paksets,
-                      projection, roadsigns, sheet, tunnels, ways)
+                      projection, roadsigns, sheet, templates, tunnels, ways)
 
 CAM_NAME = "SIMUTRANS_CAM"
 SUN_NAME = "SIMUTRANS_SUN"
@@ -794,7 +794,13 @@ def _render_one_direction(bpy, plan, code):
     return code, path
 
 
-FREIGHT_COLLECTION_PREFIX = "freight_"
+# The collection prefixes are core.templates', not ours. They used to be spelled
+# out here, which was fine while nothing else wrote them - but core.templates now
+# CREATES these collections for the artist, and a template that spells a name the
+# renderer stopped looking for is worse than no template at all. One spelling,
+# read by both sides. The old names stay as aliases: they are this module's public
+# API and the tests use them.
+FREIGHT_COLLECTION_PREFIX = templates.FREIGHT_PREFIX
 
 
 def freight_variant_count(bpy, prefix=FREIGHT_COLLECTION_PREFIX):
@@ -988,7 +994,7 @@ def render_building(bpy, out_dir, pakset_name="pak128", basename="building",
     return out
 
 
-WAY_COLLECTION_PREFIX = "way_"
+WAY_COLLECTION_PREFIX = templates.WAY_PREFIX
 
 
 def collection_piece_setup(prefix=WAY_COLLECTION_PREFIX):
@@ -1072,9 +1078,25 @@ def render_way(bpy, out_dir, pakset_name="pak128", basename="way",
 
 
 def has_slope_model(bpy, double=False, prefix=WAY_COLLECTION_PREFIX):
-    """Did the artist model the ramp? -> bool."""
+    """Did the artist model the ramp? -> bool.
+
+    An EMPTY collection is not a modelled ramp, and the difference now matters.
+    This used to ask only whether the collection existed, which was indistinguish-
+    able from the truth while the only way to have a way_slope was to make one by
+    hand and put something in it. core.templates lists way_slope for every way and
+    the panel creates what it lists, so the empty collection is now the COMMON
+    case - and answering yes to it would send render_way_slopes off to photograph
+    nothing, writing blank slope images into the .dat and leaving the way invisible
+    on every hill. Which is the exact failure the slope image exists to prevent,
+    arrived at from the other side.
+
+    `and col.objects` is what has_tunnel_model, has_bridge_model, has_front_parts
+    and _has_collection have always done. These two slope guards were the odd ones
+    out; they are not any more.
+    """
     wanted = prefix + (ways.SLOPE_PIECE_DOUBLE if double else ways.SLOPE_PIECE)
-    return any(col.name == wanted for col in bpy.data.collections)
+    return any(col.name == wanted and col.objects
+               for col in bpy.data.collections)
 
 
 def warn_if_double_slope_missing(bpy, pakset_name, prefix=WAY_COLLECTION_PREFIX):
@@ -1144,7 +1166,7 @@ def render_way_slopes(bpy, out_dir, pakset_name="pak128", basename="way",
     return frames
 
 
-TUNNEL_COLLECTION_PREFIX = "tunnel_"
+TUNNEL_COLLECTION_PREFIX = templates.TUNNEL_PREFIX
 
 
 def has_tunnel_model(bpy, prefix=TUNNEL_COLLECTION_PREFIX):
@@ -1244,7 +1266,7 @@ def build_tunnel_sheet_and_dat(portals, out_dir, pakset_name="pak128",
     return sheet_png, dat_path, back
 
 
-BRIDGE_COLLECTION_PREFIX = "bridge_"
+BRIDGE_COLLECTION_PREFIX = templates.BRIDGE_PREFIX
 
 
 def has_bridge_model(bpy, prefix=BRIDGE_COLLECTION_PREFIX):
@@ -1377,7 +1399,7 @@ def collection_variant_setup(prefix):
     return setup
 
 
-WAYOBJ_COLLECTION_PREFIX = "wayobj_"
+WAYOBJ_COLLECTION_PREFIX = templates.WAYOBJ_PREFIX
 
 
 def collection_wayobj_setup(prefix=WAYOBJ_COLLECTION_PREFIX):
@@ -1459,9 +1481,12 @@ def render_wayobj(bpy, out_dir, pakset_name="pak128", basename="wayobj",
     return frames
 
 
+# Same as has_slope_model: an empty wayobj_slope is not a modelled ramp, and the
+# template makes empty ones now. See that function for the whole argument.
 def has_wayobj_slope_model(bpy, prefix=WAYOBJ_COLLECTION_PREFIX):
     """Did the artist model the catenary on a ramp? -> bool."""
-    return any(col.name == prefix + ways.SLOPE_PIECE for col in bpy.data.collections)
+    return any(col.name == prefix + ways.SLOPE_PIECE and col.objects
+               for col in bpy.data.collections)
 
 
 def render_wayobj_slopes(bpy, out_dir, pakset_name="pak128", basename="wayobj",
