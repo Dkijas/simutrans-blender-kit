@@ -244,6 +244,58 @@ The kit could take a finished model anywhere. It could not help you start one.
   outright lie, because night lights come from *materials*, which the Materials box
   already does.
 
+## Unversioned — the example assets, after 0.7.0
+
+Three commits landed on `main` between 0.7.0 and 0.8.0 and never got a version or
+an entry here. They are asset and provenance work rather than add-on features,
+which is why `bl_info` never moved for them. They ship in v0.10.0. This is the
+record they should have had.
+
+### Fixed
+
+- **The 9000's payload split was wrong, and every check passed.** The spec guarded
+  the totals and nothing guarded the arithmetic under them. A six-car unit's `.dat`
+  does not carry "178 seats" — it carries six numbers that had better add up to it,
+  and those six were literals in the asset's module, where `spec.py` never looked.
+  So the unit shipped a split summing to 186 against its own measured 178: a whole
+  car's worth of seats.
+
+  The splits moved into `spec.json`, and `car_totals` names the fact each column
+  must sum to. A spec whose columns do not add up does not load, so it cannot
+  build. `Car.__init__` looks each car up by key, so seats, tonnes, kilowatts and
+  the lengths exist in exactly one place — **a number you cannot type twice cannot
+  drift.** `formation` states what the train is in one line; `build.py` keeps the
+  one check a spec cannot make, that the module builds the unit the spec describes,
+  in order, because a valid six-car spec can still be rendered as four.
+
+  Found by making the array load-bearing: the 9000 also still named its cars
+  `cab_a`/`int_r1`/… — keys its own module had dropped long ago — and cited two
+  "generated side elevations" that are not in the folder. Nothing read either, so
+  nothing minded.
+
+### Added
+
+- **Metro 7000 source, licensed.** The serie 7000 had been on the forum for a day
+  and did not exist in this repository: its source lived on one disk, it had no
+  licence, and nobody else could rebuild the `.pak` they had downloaded. Now CC BY
+  4.0 to victor_18993, matching its two siblings — the grant covers our geometry,
+  not Metro de Madrid's marks or the AnsaldoBreda/Pininfarina design the model
+  depicts, and it carries a note the siblings do not need: this one was built with
+  no reference photograph in the repository at all.
+
+- **`tools/spec.py`**, the loader the enforcement above runs on.
+
+### Changed
+
+- `LICENSING.md` said the kit writes the tool's name into `copyright=` and that this
+  "will change". It had changed — the text was describing a fixed bug as current. It
+  now says what is true and names which released files still carry the old credit.
+- `textures/` is no longer versioned. The livery is painted in code; those PNGs are
+  the painted flanks dumped so you can look at them, and nothing reads one back.
+
+Civia is untouched by this work and still loads: it declares no `formation` and no
+`car_totals`, so only the field checks apply to it. **Its splits remain unguarded.**
+
 ## 0.7.0
 
 Pakset profiles measured against the real pakset, not transcribed and hoped.
