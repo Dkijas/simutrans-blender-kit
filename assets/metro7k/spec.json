@@ -1,0 +1,150 @@
+{
+  "name": "MadridMetro_S7000",
+  "display_name": "Metro de Madrid Serie 7000",
+  "pakset": "pak128",
+
+  "_honesty": [
+    "Cloned from the Serie 9000, its near-identical AnsaldoBreda/Pininfarina sibling.",
+    "The one exterior difference modelled is the RED door band (the 9000 recoloured",
+    "that stripe blue). Figures specific to the 7000 - cab car 17.09 m, capacity 1260,",
+    "in service 2002 - are sourced below. Anything shared with the 9000, unpublished,",
+    "or contested (weight, prices, motor count, pantograph position) is marked."
+  ],
+
+  "facts": {
+    "speed": {
+      "value": 110,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Series_7000_y_9000 - velocidad maxima 110 km/h"
+    },
+    "power_per_motor_kw": {
+      "value": 198,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Series_7000_y_9000 - '198 kW x 8 o 16'"
+    },
+    "motors": {
+      "value": 16,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Series_7000_y_9000 - '16 motores asincronos trifasicos'",
+      "note": "CONTESTED: vialibre-ffe.com's 7000 ficha states 'total 8 motores'. We use 16 to match the 9000; the .dat power adapts either way."
+    },
+    "power_total_kw": {
+      "value": 3168,
+      "kind": "derived",
+      "formula": "power_per_motor_kw * motors = 198 * 16",
+      "source": "power_per_motor_kw, motors"
+    },
+    "capacity_total": {
+      "value": 1260,
+      "kind": "measured",
+      "source": "http://vialibre-ffe.com/noticias.asp?not=501 - 'Unidades 7000, de seis coches y 1.260 plazas'",
+      "note": "the 9000's is 1274. Different train, different figure."
+    },
+    "payload_seated": {
+      "value": 178,
+      "kind": "provisional",
+      "source": "the 7000's seated/standing split is not published on its own; 178 follows the family figure and the released 9000's seated-only payload convention, for collection consistency. The real total (1260) is above."
+    },
+    "intro_year": {
+      "value": 2002,
+      "kind": "measured",
+      "source": "http://vialibre-ffe.com/noticias.asp?not=501 - first delivery December 2001, in service 2002 (the 9000 is 2006)"
+    },
+    "length_total_m": {
+      "value": 107.0,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Series_7000_y_9000 - '107 m (6 coches)'"
+    },
+    "length_cab_car_m": {
+      "value": 17.09,
+      "kind": "measured",
+      "source": "http://vialibre-ffe.com/noticias.asp?not=501 - coches motor con cabina 17.090 mm",
+      "note": "the 9000's cab car is 18.425 m; the 7000's is shorter. Both still round to length 8."
+    },
+    "length_intermediate_m": {
+      "value": 16.88,
+      "kind": "measured",
+      "source": "http://vialibre-ffe.com/noticias.asp?not=501 - coches sin cabina y remolques 16.880 mm"
+    },
+    "width_m": {
+      "value": 2.8,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Series_7000_y_9000 - ancho de caja 2,8 m (2808 mm)"
+    },
+    "height_m": {
+      "value": 3.65,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Series_7000_y_9000 - 3,65 m"
+    },
+    "floor_height_m": {
+      "value": 1.125,
+      "kind": "measured",
+      "source": "http://vialibre-ffe.com/noticias.asp?not=501 - altura del piso sobre carril 1.125 mm"
+    },
+    "doors_per_side_per_car": {
+      "value": 4,
+      "kind": "measured",
+      "source": "http://vialibre-ffe.com/noticias.asp?not=501 - 24 puertas por banda en 6 coches = 4 por coche y costado"
+    },
+    "door_width_m": {
+      "value": 1.3,
+      "kind": "measured",
+      "source": "http://vialibre-ffe.com/noticias.asp?not=501 - paso libre 1.300 mm"
+    },
+    "voltage_v": {
+      "value": 1500,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Series_7000_y_9000 - 1500 Vcc monotension (subserie 7400 es bitension 600/1500)"
+    },
+    "units_built": {
+      "value": 30,
+      "kind": "measured",
+      "source": "http://vialibre-ffe.com/noticias.asp?not=501 - contrato de 30 trenes de seis coches",
+      "note": "37 compositions total counting the 7 bitension 7400 units."
+    },
+    "length_carunits": {
+      "value": 8,
+      "kind": "derived",
+      "formula": "cab 17.09 and intermediate 16.88 m differ ~1%, far below the 1-carunit quantum, so every car rounds to the same length and each joint (L_prev - L_this)/2 is exactly zero",
+      "source": "simconvoi.cc:428, core/convoy.py, length_cab_car_m, length_intermediate_m"
+    },
+    "weight_total_t": {
+      "value": 200,
+      "kind": "provisional",
+      "source": "a guess. AnsaldoBreda does not publish the 7000's mass and no source we found states it. Balance it before anyone plays with it."
+    },
+    "cost": {
+      "value": 2000000,
+      "kind": "provisional",
+      "source": "a guess, in cents; a balance figure set slightly below the 9000 so the older base model is the cheaper of the two"
+    },
+    "runningcost": {
+      "value": 200,
+      "kind": "provisional",
+      "source": "a guess, per km; a balance figure"
+    },
+    "window_colour": {
+      "value": "#57656F",
+      "kind": "engine",
+      "source": "display/simgraph16.cc:416 display_day_lights[0] -> #D3C380 at night"
+    },
+    "headlight_colour": {
+      "value": "#E3E3FF",
+      "kind": "engine",
+      "source": "display/simgraph16.cc:416 display_day_lights[10] -> #FFFFE3 at night"
+    }
+  },
+
+  "reference": {
+    "note": "No 7000 reference photograph in the repo yet. The livery layout (ivory with a high blue band) and the cab shape are shared with the 9000; the RED door band comes from the sources' description of the 9000-vs-7000 difference. Confirm the front colour and pantograph position against a photo before release."
+  },
+
+  "cars": [
+    {"key": "s7k_cab_a", "role": "Mc", "cab": true,  "panto": true,  "reversed": false},
+    {"key": "s7k_rem_a", "role": "R",  "cab": false, "panto": false, "reversed": false},
+    {"key": "s7k_mot_a", "role": "M",  "cab": false, "panto": false, "reversed": false},
+    {"key": "s7k_mot_b", "role": "M",  "cab": false, "panto": false, "reversed": false},
+    {"key": "s7k_rem_b", "role": "R",  "cab": false, "panto": false, "reversed": false},
+    {"key": "s7k_cab_b", "role": "Mc", "cab": true,  "panto": true,  "reversed": true}
+  ]
+}

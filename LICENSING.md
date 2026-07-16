@@ -35,20 +35,22 @@ Two things worth knowing rather than discovering later:
 
 ## The example assets: CC BY 4.0, with a trademark note
 
-`assets/civia_465/` and `assets/metro9k/` are 3D models of a **Renfe Civia 465**
-and a **Madrid Metro serie 9000**, modelled by **victor_18993**.
+`assets/civia_465/`, `assets/metro9k/` and `assets/metro7k/` are 3D models of a
+**Renfe Civia 465**, a **Madrid Metro serie 9000** and a **Madrid Metro serie
+7000**, modelled by **victor_18993**.
 
 The **original work** — the geometry, the textures, and the `.blend` files — is
 licensed **CC BY 4.0** (Creative Commons Attribution 4.0 International,
 <https://creativecommons.org/licenses/by/4.0/>). You may use, modify and
 redistribute it, including commercially, as long as you credit the modeller. Each
-of the two folders carries its own `LICENSE.md` with the exact attribution line.
+of the three folders carries its own `LICENSE.md` with the exact attribution line.
 
 **What the licence does not cover.** These models wear the names, liveries and
 shapes of two real operators' trains. A licence grants rights to *our* work; it
 cannot grant rights to third-party trademarks or industrial designs. "Renfe",
-"Civia", "Metro de Madrid", "serie 9000", and the operators' liveries and marks,
-belong to their respective owners and appear here only to depict the real vehicles.
+"Civia", "Metro de Madrid", "serie 9000", "serie 7000", and the operators'
+liveries and marks, belong to their respective owners and appear here only to
+depict the real vehicles.
 **The CC BY 4.0 grant applies solely to the original 3D modelling work; it makes no
 claim over, and grants no rights in, those trademarks or designs.** If you reuse
 the models, that third-party layer travels with them and is your responsibility.
@@ -62,6 +64,13 @@ them and cannot relicense them.
 
 ## What this means if you contribute a pakset object
 
-The kit writes `copyright=` into every `.dat` it generates. Today it writes the
-name of the *tool*, which is wrong — the art is yours and should say so. That is
-tracked and will change.
+The kit writes `copyright=` into every `.dat` it generates, and it writes the
+value the asset gives it — the artist's name, not the tool's. `datgen`'s default
+is an empty string, so an asset that forgets to say who made it credits nobody
+rather than credit us; each asset sets `AUTHOR` at the top of its module.
+
+This was not always so: the kit used to write its own name there, and
+`MadridMetroS9000.pak` and `CiviaS465.pak` were released before the change, so
+those two published files credit `simutrans-blender-kit` instead of the modeller.
+Anything rebuilt from the current sources is correct, and `tests/test_credits.py`
+now fails the build if the tool's name ever reaches a `.dat` again.

@@ -22,6 +22,10 @@ assets/*/sprites/
 assets/*/dat/
 assets/*/pak/
 assets/*/reports/
+# textures/ is written by the same build: the livery is painted in code, and these
+# are the painted flanks dumped so you can look at them. An output, not an input -
+# nothing ever reads one back in.
+assets/*/textures/
 
 # Reference photographs of real vehicles. Not ignored because they are derived -
 # ignored because we do not own them. This repository is meant to carry a licence,
