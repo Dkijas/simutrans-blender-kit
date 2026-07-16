@@ -1402,6 +1402,11 @@ def _ui_user_facing_strings():
                 if (isinstance(t, ast.Name) and t.id in ("bl_label", "bl_description")
                         and isinstance(n.value, ast.Constant)):
                     out.add(n.value.value)
+    # An empty label is not a string to translate. `text=""` on an operator means
+    # "draw the icon and no words" - which is how a compact row of up/down/delete
+    # buttons is built - and demanding a translation for "" would be demanding a
+    # translation for the absence of a word.
+    out = {s for s in out if s and s.strip()}
     return out - _UNTRANSLATED
 
 

@@ -26,12 +26,14 @@ from bpy.types import Operator, Panel, PropertyGroup
 
 try:
     from . import library, rig, template, translations, workflow
-    from ..core import (buildings, colors, components, factories, night, package,
-                        paksets, scenecheck, schema, sheet, templates, variants)
+    from ..core import (buildings, colors, components, consists, contact,
+                        document, factories, night, package, paksets,
+                        scenecheck, schema, sheet, templates, variants)
 except ImportError:                                   # running from a checkout
     from addon import library, rig, template, translations, workflow
-    from core import (buildings, colors, components, factories, night, package,
-                      paksets, scenecheck, schema, sheet, templates, variants)
+    from core import (buildings, colors, components, consists, contact,
+                      document, factories, night, package, paksets,
+                      scenecheck, schema, sheet, templates, variants)
 
 CTX = translations.CONTEXT
 
@@ -397,6 +399,46 @@ class SimutransProps(PropertyGroup):
         description="What the scene looked like when the preview was made. Not "
                     "for editing")
 
+    # Which variant is painted onto the scene right now, if any.
+    #
+    # Applying a variant REWRITES material slots - that is not a choice, it is how
+    # Blender assigns a material, so there is no honest "temporary" preview that
+    # leaves the scene untouched. Rather than pretend, the panel says out loud
+    # which variant you are looking at and offers one button to undo it.
+    variant_applied: StringProperty(
+        name="Applied", translation_context=CTX, default="",
+        description="The variant currently painted onto the scene. Applying one "
+                    "really does change the materials - it is not a preview")
+
+    # --- consists
+    consist_name: StringProperty(
+        name="Consist name", translation_context=CTX, default="",
+        description="What this formation is called. It is for you and the "
+                    "catalogue - the engine has no such thing as a formation")
+    consist_index: IntProperty(name="Consist", translation_context=CTX,
+                               default=0, min=0)
+    consist_vehicle: StringProperty(
+        name="Vehicle", translation_context=CTX, default="",
+        description="The name= of a vehicle or a variant to put in this train")
+    consist_placement: EnumProperty(
+        name="Goes", translation_context=CTX,
+        items=[("anywhere", "Anywhere", "no restriction"),
+               ("head", "Front only", "may only be at the front of a train"),
+               ("tail", "Back only", "may only be at the back"),
+               ("middle", "Middle only", "may never be at either end")],
+        default="anywhere",
+    )
+    consist_min: IntProperty(
+        name="At least", translation_context=CTX, default=1, min=0,
+        description="0 makes it optional - the train is buildable without it")
+    consist_max: IntProperty(
+        name="At most", translation_context=CTX, default=1, min=1,
+        description="More than 1 makes it a repeatable section, and lets it "
+                    "couple to itself")
+    consist_reversible: BoolProperty(
+        name="Runs either way", translation_context=CTX, default=False,
+        description="The same cars may run in the mirrored order too")
+
     # --- publishing
     pkg_version: StringProperty(name="Version", translation_context=CTX,
                                 default="1.0.0")
@@ -472,8 +514,15 @@ def _names(text):
     And no constraint at all is not the same as a constraint of `none`: with no
     Constraint[Prev] the vehicle couples behind anything, while a Prev list whose
     only entry is `none` means "the only thing allowed in front of me is nothing",
-    so the vehicle can ONLY ever run alone (descriptor/vehicle_desc.h:219). The
-    empty field therefore has to stay empty, not become "none".
+    so the vehicle may ONLY run at the HEAD of a train (vehicle_desc.h:219 -
+    can_follow returns true for a NULL prev_veh, which is what "at the head"
+    means). The empty field therefore has to stay empty, not become "none".
+
+    This docstring used to say a lone `none` made the vehicle "run alone". That
+    was wrong, and core/datgen.py said so correctly in the same repo - running
+    alone needs `none` on BOTH sides. The shipped Civia settles it: its cab_a has
+    Constraint[Prev][0]=none and Constraint[Next][0]=CiviaS465_Int1, and it leads
+    five cars. See docs/constraints-in-simutrans.md.
     """
     return tuple(n.strip() for n in text.split(",") if n.strip())
 
@@ -1310,6 +1359,7 @@ class SIMUTRANS_PT_panel(Panel):
         # Preview sits between Validate and Render: it is the render, of one
         # heading, so it is the cheap way to see what the expensive one will say.
         acts.operator("simutrans.preview", icon="SEQ_PREVIEW")
+        acts.operator("simutrans.preview_sheet", icon="IMGDISPLAY")
         if p.preview_fingerprint and workflow.is_stale(bpy, p,
                                                        p.preview_fingerprint):
             # Saying so is the whole difference between a preview and a guess. A
@@ -1395,13 +1445,46 @@ class SIMUTRANS_PT_dat(Panel):
             warn.label(text="State 0 is RED.", text_ctxt=CTX)
 
 
+def _doc(p):
+    """The one persisted document. core/document.py owns the format.
+
+    Phase 2 stored variants alone in this property; document.load migrates that
+    shape forward, so a .blend saved by 0.9.0 opens with its variants intact.
+    """
+    return document.load(p.variants_json, p.obj_type)
+
+
+def _save_doc(p, doc):
+    """Write it back - unless it came from a newer kit than this one.
+
+    Refusing is the point. A document we could not read is one we have nothing to
+    say about, and saying it anyway would truncate somebody's project to the
+    subset this version understands.
+    """
+    if doc.from_the_future:
+        return False
+    p.variants_json = document.dump(doc)
+    return True
+
+
 def _vset(p):
-    """The variant document, parsed. core/variants.py owns the format."""
-    return variants.load(p.variants_json, p.obj_type)
+    return _doc(p).variants
 
 
 def _save_vset(p, vset):
-    p.variants_json = variants.dump(vset)
+    doc = _doc(p)
+    doc.variants = vset
+    return _save_doc(p, doc)
+
+
+def _cset(p):
+    return _doc(p).consists
+
+
+def _save_cset(p, cset):
+    doc = _doc(p)
+    doc.consists = cset
+    return _save_doc(p, doc)
 
 
 def _base_fields(p):
@@ -1520,6 +1603,7 @@ class SIMUTRANS_OT_variant_apply(Operator):
             say(self, {"ERROR"}, _("No variant selected"))
             return {"CANCELLED"}
         changed = workflow.apply_variant(bpy, cur, p.pakset)
+        p.variant_applied = cur.name
         say(self, {"INFO"}, _("%s: %d material(s) repainted")
             % (cur.name, len(changed["materials"])))
         return {"FINISHED"}
@@ -1584,30 +1668,43 @@ class SIMUTRANS_OT_render_variants(Operator):
                 % len(errs))
             return {"CANCELLED"}
 
+        # The scene goes back exactly as it was, whether this finishes, raises or
+        # is cancelled. Phase 2 left the LAST variant applied, so an artist who
+        # rendered a family found their scene painted in whichever livery came
+        # last - indistinguishable from one they had painted themselves.
         made = []
-        for v in vset.variants:
-            workflow.apply_variant(bpy, v, p.pakset)
-            fields = variants.resolve(v, base)
-            frames = rig.render_directions(
-                bpy, out, p.pakset, dirs=int(p.dirs), basename=v.name,
-                align_offset=tuple(p.align_offset))
-            _png, dat, _pl = rig.build_sheet_and_dat(
-                frames, out, p.pakset, basename=v.name, cols=4,
-                name=fields["obj_name"], author=fields.get("author", ""),
-                waytype=fields.get("waytype", "track"),
-                engine_type=fields.get("engine_type", "diesel"),
-                speed=fields.get("speed", 100), power=fields.get("power", 0),
-                weight=fields.get("weight", 20), length=fields.get("length", 8),
-                payload=fields.get("payload", 0),
-                freight=fields.get("freight", "None"),
-                cost=fields.get("cost", 0),
-                runningcost=fields.get("runningcost", 0),
-                intro_year=fields.get("intro_year", 1900),
-                constraint_prev=_names(fields.get("constraint_prev", "")),
-                constraint_next=_names(fields.get("constraint_next", "")))
-            made.append(os.path.basename(dat))
-            _report_lint(self, dat)
+        with workflow.SceneRestore(bpy) as guard:
+            for v in vset.variants:
+                workflow.apply_variant(bpy, v, p.pakset)
+                fields = variants.resolve(v, base)
+                frames = rig.render_directions(
+                    bpy, out, p.pakset, dirs=int(p.dirs), basename=v.name,
+                    align_offset=tuple(p.align_offset))
+                _png, dat, _pl = rig.build_sheet_and_dat(
+                    frames, out, p.pakset, basename=v.name, cols=4,
+                    name=fields["obj_name"], author=fields.get("author", ""),
+                    waytype=fields.get("waytype", "track"),
+                    engine_type=fields.get("engine_type", "diesel"),
+                    speed=fields.get("speed", 100), power=fields.get("power", 0),
+                    weight=fields.get("weight", 20),
+                    length=fields.get("length", 8),
+                    payload=fields.get("payload", 0),
+                    freight=fields.get("freight", "None"),
+                    cost=fields.get("cost", 0),
+                    runningcost=fields.get("runningcost", 0),
+                    intro_year=fields.get("intro_year", 1900),
+                    constraint_prev=_names(fields.get("constraint_prev", "")),
+                    constraint_next=_names(fields.get("constraint_next", "")))
+                made.append(os.path.basename(dat))
+                _report_lint(self, dat)
 
+        # A restoration that failed is said out loud. Silence would leave the
+        # artist believing the scene is theirs when it is not.
+        for f in guard.findings():
+            say(self, {"WARNING"} if f.level == scenecheck.WARNING else {"INFO"},
+                _(f.message) if f.code == "restored" else f.message)
+
+        p.variant_applied = ""
         say(self, {"INFO"}, _("%d variant(s) rendered: %s")
             % (len(made), ", ".join(made)))
         return {"FINISHED"}
@@ -1743,6 +1840,328 @@ class SIMUTRANS_OT_package(Operator):
         return {"FINISHED"}
 
 
+def _current_consist(p):
+    cset = _cset(p)
+    if not cset.consists:
+        return cset, None
+    i = min(p.consist_index, len(cset.consists) - 1)
+    return cset, cset.consists[i]
+
+
+def _known_vehicles(p):
+    """Every name a consist may legitimately point at: the base object and every
+    variant, because a variant IS an object with its own name."""
+    names = {v.name for v in _vset(p).variants}
+    if p.obj_name.strip():
+        names.add(p.obj_name.strip())
+    return names
+
+
+class SIMUTRANS_OT_consist_add(Operator):
+    bl_idname = "simutrans.consist_add"
+    bl_label = "Add Consist"
+    bl_translation_context = CTX
+    bl_description = ("Describe a train: which vehicles, in what order. The "
+                      "coupling rules are worked out from it")
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        cset = _cset(p)
+        name = (p.consist_name or "").strip() or "Formation_%d" % (
+            len(cset.consists) + 1)
+        cset, c = consists.add(cset, name, reversible=p.consist_reversible)
+        if not _save_cset(p, cset):
+            say(self, {"ERROR"}, _("This project was saved by a newer version of "
+                                   "the kit. Nothing was changed"))
+            return {"CANCELLED"}
+        p.consist_index = len(cset.consists) - 1
+        say(self, {"INFO"}, _("Consist %s added (%d in all)")
+            % (c.name, len(cset.consists)))
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_consist_duplicate(Operator):
+    bl_idname = "simutrans.consist_duplicate"
+    bl_label = "Duplicate"
+    bl_translation_context = CTX
+    bl_description = "Copy the selected formation, vehicles and all"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        cset, cur = _current_consist(p)
+        if cur is None:
+            say(self, {"ERROR"}, _("No consist selected"))
+            return {"CANCELLED"}
+        cset, copy = consists.duplicate(cset, cur.key)
+        _save_cset(p, cset)
+        p.consist_index = len(cset.consists) - 1
+        say(self, {"INFO"}, _("Consist %s added (%d in all)")
+            % (copy.name, len(cset.consists)))
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_consist_rename(Operator):
+    bl_idname = "simutrans.consist_rename"
+    bl_label = "Rename"
+    bl_translation_context = CTX
+    bl_description = "Rename the selected formation"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        cset, cur = _current_consist(p)
+        if cur is None:
+            say(self, {"ERROR"}, _("No consist selected"))
+            return {"CANCELLED"}
+        name = (p.consist_name or "").strip()
+        if not name:
+            say(self, {"ERROR"}, _("Type the new name first"))
+            return {"CANCELLED"}
+        _save_cset(p, consists.rename(cset, cur.key, name))
+        say(self, {"INFO"}, _("%s is now %s") % (cur.name, name))
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_consist_remove(Operator):
+    bl_idname = "simutrans.consist_remove"
+    bl_label = "Remove"
+    bl_translation_context = CTX
+    bl_description = "Delete the selected formation"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        cset, cur = _current_consist(p)
+        if cur is None:
+            say(self, {"ERROR"}, _("No consist selected"))
+            return {"CANCELLED"}
+        _save_cset(p, consists.remove(cset, cur.key))
+        p.consist_index = max(0, p.consist_index - 1)
+        say(self, {"INFO"}, _("Removed %s") % cur.name)
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_consist_add_vehicle(Operator):
+    bl_idname = "simutrans.consist_add_vehicle"
+    bl_label = "Add Vehicle"
+    bl_translation_context = CTX
+    bl_description = "Put a vehicle at the back of the selected formation"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        cset, cur = _current_consist(p)
+        if cur is None:
+            say(self, {"ERROR"}, _("No consist selected"))
+            return {"CANCELLED"}
+        veh = (p.consist_vehicle or "").strip()
+        if not veh:
+            say(self, {"ERROR"}, _("Type a vehicle name first"))
+            return {"CANCELLED"}
+        cset, _m = consists.add_member(
+            cset, cur.key, veh, placement=p.consist_placement,
+            min_count=p.consist_min, max_count=p.consist_max)
+        _save_cset(p, cset)
+        say(self, {"INFO"}, _("%s added to %s") % (veh, cur.name))
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_consist_move(Operator):
+    bl_idname = "simutrans.consist_move"
+    bl_label = "Move"
+    bl_translation_context = CTX
+    bl_description = "Move a vehicle up or down the train"
+    bl_options = {"REGISTER", "UNDO"}
+
+    member: StringProperty()
+    delta: IntProperty(default=-1)
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        cset, cur = _current_consist(p)
+        if cur is None:
+            return {"CANCELLED"}
+        _save_cset(p, consists.move_member(cset, cur.key, self.member, self.delta))
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_consist_remove_vehicle(Operator):
+    bl_idname = "simutrans.consist_remove_vehicle"
+    bl_label = "Remove vehicle"
+    bl_translation_context = CTX
+    bl_description = "Take a vehicle out of the formation"
+    bl_options = {"REGISTER", "UNDO"}
+
+    member: StringProperty()
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        cset, cur = _current_consist(p)
+        if cur is None:
+            return {"CANCELLED"}
+        _save_cset(p, consists.remove_member(cset, cur.key, self.member))
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_consist_check(Operator):
+    bl_idname = "simutrans.consist_check"
+    bl_label = "Check Consists"
+    bl_translation_context = CTX
+    bl_description = ("Impossible formations, broken references, and vehicles "
+                      "that could never lead or end a train")
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        cset = _cset(p)
+        findings = consists.check(cset, known=_known_vehicles(p))
+        for f in findings:
+            level = {consists.ERROR: "ERROR",
+                     consists.WARNING: "WARNING"}.get(f.level, "INFO")
+            say(self, {level}, "%s: %s" % (f.code, _(f.message)))
+        errs = consists.blocking(findings)
+        if errs:
+            say(self, {"ERROR"}, _("%d error(s) - fix these before applying")
+                % len(errs))
+        else:
+            say(self, {"INFO"}, _("%d consist(s), nothing wrong")
+                % len(cset.consists))
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_consist_constraints(Operator):
+    bl_idname = "simutrans.consist_constraints"
+    bl_label = "Show Constraints"
+    bl_translation_context = CTX
+    bl_description = ("Work out the coupling rules these formations imply, and "
+                      "show them. Nothing is written")
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        cset = _cset(p)
+        if not cset.consists:
+            say(self, {"ERROR"}, _("No consists to work from"))
+            return {"CANCELLED"}
+
+        gen = consists.constraints(cset)
+        current = {p.obj_name: (_names(p.constraint_prev),
+                                _names(p.constraint_next))} if p.obj_name else {}
+        for veh, (prev, nxt) in sorted(gen.items()):
+            say(self, {"INFO"}, "%s: Prev=%s Next=%s"
+                % (veh, ", ".join(prev) or "-", ", ".join(nxt) or "-"))
+
+        # The diff, so nothing is a surprise. A tool that silently rewrites the
+        # coupling of every vehicle in a project is one nobody should press.
+        d = consists.diff(cset, current)
+        for veh, (added, removed, kept) in sorted(d.items()):
+            if added or removed:
+                say(self, {"INFO"}, _("%s: %d to add, %d to remove, %d already right")
+                    % (veh, len(added), len(removed), len(kept)))
+        say(self, {"INFO"}, _("%d vehicle(s). Nothing was written")
+            % len(gen))
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_consist_apply(Operator):
+    bl_idname = "simutrans.consist_apply"
+    bl_label = "Apply to this vehicle"
+    bl_translation_context = CTX
+    bl_description = ("Put the worked-out coupling rules for the CURRENT object "
+                      "into its two constraint fields")
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        cset = _cset(p)
+        errs = consists.blocking(consists.check(cset, known=_known_vehicles(p)))
+        if errs:
+            for f in errs:
+                say(self, {"ERROR"}, "%s: %s" % (f.code, _(f.message)))
+            say(self, {"ERROR"}, _("%d error(s) - fix these before applying")
+                % len(errs))
+            return {"CANCELLED"}
+
+        gen = consists.constraints(cset)
+        mine = gen.get(p.obj_name)
+        if mine is None:
+            say(self, {"ERROR"},
+                _("%r is not in any consist, so there is nothing to apply")
+                % p.obj_name)
+            return {"CANCELLED"}
+        p.constraint_prev = ", ".join(mine[0])
+        p.constraint_next = ", ".join(mine[1])
+        say(self, {"INFO"}, _("%s: Prev=%s Next=%s")
+            % (p.obj_name, p.constraint_prev or "-", p.constraint_next or "-"))
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_variant_clear(Operator):
+    bl_idname = "simutrans.variant_clear"
+    bl_label = "Back to base"
+    bl_translation_context = CTX
+    bl_description = ("Put the base materials back. Applying a variant really "
+                      "does repaint the scene - this undoes it")
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        base = {}
+        for name in workflow.scene_materials(bpy):
+            # Our variant materials are named "<base>__<key>"; the base is what
+            # is left when that suffix comes off.
+            if "__v" in name:
+                base.setdefault(name.split("__v")[0], name)
+        restored = 0
+        for ob in bpy.data.objects:
+            if ob.type != "MESH" or not getattr(ob.data, "materials", None):
+                continue
+            for i, mat in enumerate(ob.data.materials):
+                if mat is None or "__v" not in mat.name:
+                    continue
+                want = bpy.data.materials.get(mat.name.split("__v")[0])
+                if want is not None:
+                    ob.data.materials[i] = want
+                    restored += 1
+        p.variant_applied = ""
+        if not restored:
+            say(self, {"INFO"}, _("Nothing to undo - no variant is applied"))
+            return {"FINISHED"}
+        say(self, {"INFO"}, _("%d material slot(s) back to the base") % restored)
+        return {"FINISHED"}
+
+
+class SIMUTRANS_OT_preview_sheet(Operator):
+    bl_idname = "simutrans.preview_sheet"
+    bl_label = "Preview All 8"
+    bl_translation_context = CTX
+    bl_description = ("Render all eight headings through the final render's own "
+                      "code path and put them on one labelled page. The page is "
+                      "an extra file - the frames the .dat uses are not touched")
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        out, why = _out_dir(p)
+        if out is None:
+            say(self, {"ERROR"}, why)
+            return {"CANCELLED"}
+        mins, maxs = rig.scene_bounds(bpy)
+        if maxs[2] <= mins[2]:
+            say(self, {"ERROR"}, _("Nothing to render - the scene has no mesh"))
+            return {"CANCELLED"}
+
+        png, frames, place, mark = workflow.preview_sheet(bpy, out, p, dirs=8)
+        p.preview_fingerprint = mark
+        for line in workflow.sheet_report(bpy, frames, place, p, dirs=8):
+            say(self, {"WARNING"} if "MISSING" in line or "not all" in line
+                else {"INFO"}, line)
+        if p.variant_applied:
+            say(self, {"INFO"}, _("showing variant %s") % p.variant_applied)
+        say(self, {"INFO"}, _("%s - the same camera as the final render")
+            % os.path.basename(png))
+        return {"FINISHED"}
+
+
 class SIMUTRANS_PT_reference(Panel):
     """Reference photos. A sub-panel, closed by default, because an artist who
     has no photo should not have to scroll past six fields to reach Render."""
@@ -1817,11 +2236,100 @@ class SIMUTRANS_PT_variants(Panel):
             row.operator("simutrans.variant_remove", icon="X")
             box.operator("simutrans.variant_apply", icon="HIDE_OFF")
 
+        # Applying a variant really repaints the scene - Blender has no other way
+        # to assign a material - so rather than pretend it is a preview, say which
+        # one you are looking at and offer one button to undo it.
+        if p.variant_applied:
+            note = col.box()
+            note.alert = True
+            note.label(text=_("Applied: %s") % p.variant_applied, icon="INFO",
+                       text_ctxt=CTX)
+            note.label(text="The scene really is repainted.", text_ctxt=CTX)
+            note.operator("simutrans.variant_clear", icon="LOOP_BACK")
+
         col.separator()
         col.operator("simutrans.variant_check", icon="CHECKMARK")
         acts = col.column()
         acts.enabled = _out_dir(p)[0] is not None
         acts.operator("simutrans.render_variants", icon="RENDER_ANIMATION")
+        col.label(text="Rendering all puts the scene back.", icon="INFO",
+                  text_ctxt=CTX)
+
+
+class SIMUTRANS_PT_consists(Panel):
+    """Formations. Closed by default - a single vehicle needs none of it."""
+    bl_label = "Consists"
+    bl_translation_context = CTX
+    bl_idname = "SIMUTRANS_PT_consists"
+    bl_parent_id = "SIMUTRANS_PT_panel"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Simutrans"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    def draw(self, context):
+        p = context.scene.simutrans
+        col = self.layout.column()
+        cset, cur = _current_consist(p)
+
+        # The engine has vehicles and pairwise coupling rules. It has no idea what
+        # a "formation" is - so this is the artist's statement of a train they
+        # intend, and its only output is those rules.
+        col.label(text="Describe the train; the coupling", icon="INFO",
+                  text_ctxt=CTX)
+        col.label(text="rules are worked out from it.", text_ctxt=CTX)
+
+        col.prop(p, "consist_name")
+        col.prop(p, "consist_reversible")
+        row = col.row(align=True)
+        row.operator("simutrans.consist_add", icon="ADD")
+        row.operator("simutrans.consist_duplicate", icon="DUPLICATE")
+
+        if not cset.consists:
+            col.label(text="No consists yet.", text_ctxt=CTX)
+            return
+
+        col.separator()
+        col.prop(p, "consist_index", slider=True)
+        if cur is None:
+            return
+
+        box = col.box()
+        box.label(text=cur.name, icon="OUTLINER_OB_GROUP_INSTANCE", text_ctxt=CTX)
+        for i, m in enumerate(cur.members):
+            row = box.row(align=True)
+            tag = m.vehicle
+            if m.placement != consists.ANYWHERE:
+                tag += " (%s)" % m.placement
+            if m.max_count > 1 or m.min_count == 0:
+                tag += " x%d-%d" % (m.min_count, m.max_count)
+            row.label(text="%d. %s" % (i + 1, tag), text_ctxt=CTX)
+            up = row.operator("simutrans.consist_move", text="", icon="TRIA_UP")
+            up.member, up.delta = m.key, -1
+            dn = row.operator("simutrans.consist_move", text="", icon="TRIA_DOWN")
+            dn.member, dn.delta = m.key, 1
+            rm = row.operator("simutrans.consist_remove_vehicle", text="",
+                              icon="X")
+            rm.member = m.key
+        if not cur.members:
+            box.label(text="Empty.", text_ctxt=CTX)
+
+        row = box.row(align=True)
+        row.operator("simutrans.consist_rename", icon="GREASEPENCIL")
+        row.operator("simutrans.consist_remove", icon="X")
+
+        col.separator()
+        col.prop(p, "consist_vehicle")
+        col.prop(p, "consist_placement")
+        row = col.row(align=True)
+        row.prop(p, "consist_min")
+        row.prop(p, "consist_max")
+        col.operator("simutrans.consist_add_vehicle", icon="ADD")
+
+        col.separator()
+        col.operator("simutrans.consist_check", icon="CHECKMARK")
+        col.operator("simutrans.consist_constraints", icon="ZOOM_ALL")
+        col.operator("simutrans.consist_apply", icon="CHECKMARK")
 
 
 class SIMUTRANS_PT_components(Panel):
@@ -1886,9 +2394,15 @@ CLASSES = (SimutransProps, SIMUTRANS_OT_build_rig, SIMUTRANS_OT_create_template,
            SIMUTRANS_OT_render_variants,
            SIMUTRANS_OT_refresh_components, SIMUTRANS_OT_insert_component,
            SIMUTRANS_OT_preview, SIMUTRANS_OT_package,
+           SIMUTRANS_OT_variant_clear, SIMUTRANS_OT_preview_sheet,
+           SIMUTRANS_OT_consist_add, SIMUTRANS_OT_consist_duplicate,
+           SIMUTRANS_OT_consist_rename, SIMUTRANS_OT_consist_remove,
+           SIMUTRANS_OT_consist_add_vehicle, SIMUTRANS_OT_consist_move,
+           SIMUTRANS_OT_consist_remove_vehicle, SIMUTRANS_OT_consist_check,
+           SIMUTRANS_OT_consist_constraints, SIMUTRANS_OT_consist_apply,
            SIMUTRANS_PT_panel, SIMUTRANS_PT_dat,
            SIMUTRANS_PT_reference, SIMUTRANS_PT_variants,
-           SIMUTRANS_PT_components, SIMUTRANS_PT_publish)
+           SIMUTRANS_PT_consists, SIMUTRANS_PT_components, SIMUTRANS_PT_publish)
 
 
 _TRANSLATION_DOMAIN = "simutrans_blender_kit"

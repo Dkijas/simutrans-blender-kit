@@ -406,6 +406,16 @@ def suite_blender_phase2():
     return _blender("blender_phase2.py", "PHASE2_OK")
 
 
+def suite_components_catalog():
+    """Build the shipped components from source, and check every one is insertable."""
+    return _blender("../tools/build_components.py", "COMPONENTS_BUILD_OK")
+
+
+def suite_blender_phase3():
+    """Consists, the 8-direction sheet, the real catalogue, putting the scene back."""
+    return _blender("blender_phase3.py", "PHASE3_OK")
+
+
 def suite_blender_way():
     """A way: six models turned into sixteen ribi images, checked pixel by pixel."""
     return _blender("blender_way.py", "WAY_OK")
@@ -547,6 +557,8 @@ SUITES = {
     "profile": suite_profile,
     "template": suite_blender_template,
     "phase2": suite_blender_phase2,
+    "components-catalog": suite_components_catalog,
+    "phase3": suite_blender_phase3,
     "e2e": suite_blender_e2e,
     "alignment": suite_blender_alignment,
     "building": suite_blender_building,
@@ -585,7 +597,7 @@ ORDER = ("core", "templates", "scenecheck", "variants", "package",
          "components", "consists", "schema", "colours", "profile",
          # producers: the art and the .dat. "template" leads them - it is what
          # makes the scene the rest of them render.
-         "template", "phase2",
+         "template", "phase2", "components-catalog", "phase3",
          "e2e", "alignment", "building", "footprint", "way", "freight", "tunnel",
          "bridge", "infra", "addon", "panel", "demo-all", "demo-loco",
          # the .pak the game will load, compiled from what was just rendered

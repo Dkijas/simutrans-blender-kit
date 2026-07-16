@@ -155,6 +155,67 @@ SOURCE_STRINGS = (
     'Nothing is uploaded.',
     '%s - %d file(s). Nothing was uploaded',
     '%d error(s) - the package was NOT written',
+
+    # --- phase 3: consists, contact sheet, variant restore
+    'Consists',
+    'Consist',
+    'Consist name',
+    'What this formation is called. It is for you and the catalogue - the engine has no such thing as a formation',
+    'Describe the train; the coupling',
+    'rules are worked out from it.',
+    'No consists yet.',
+    'Empty.',
+    'Runs either way',
+    'The same cars may run in the mirrored order too',
+    'Add Consist',
+    'Describe a train: which vehicles, in what order. The coupling rules are worked out from it',
+    'Copy the selected formation, vehicles and all',
+    'Rename the selected formation',
+    'Delete the selected formation',
+    'Add Vehicle',
+    'Put a vehicle at the back of the selected formation',
+    'Vehicle',
+    'The name= of a vehicle or a variant to put in this train',
+    'Goes',
+    'At least',
+    '0 makes it optional - the train is buildable without it',
+    'At most',
+    'More than 1 makes it a repeatable section, and lets it couple to itself',
+    'Move',
+    'Move a vehicle up or down the train',
+    'Remove vehicle',
+    'Take a vehicle out of the formation',
+    'Check Consists',
+    'Impossible formations, broken references, and vehicles that could never lead or end a train',
+    'Show Constraints',
+    'Work out the coupling rules these formations imply, and show them. Nothing is written',
+    'Apply to this vehicle',
+    'Put the worked-out coupling rules for the CURRENT object into its two constraint fields',
+    'Consist %s added (%d in all)',
+    'No consist selected',
+    'No consists to work from',
+    'Type a vehicle name first',
+    '%s added to %s',
+    '%d consist(s), nothing wrong',
+    '%d error(s) - fix these before applying',
+    '%s: Prev=%s Next=%s',
+    '%s: %d to add, %d to remove, %d already right',
+    '%d vehicle(s). Nothing was written',
+    '%r is not in any consist, so there is nothing to apply',
+    'Applied',
+    'Applied: %s',
+    'The variant currently painted onto the scene. Applying one really does change the materials - it is not a preview',
+    'The scene really is repainted.',
+    'Back to base',
+    'Put the base materials back. Applying a variant really does repaint the scene - this undoes it',
+    'Nothing to undo - no variant is applied',
+    '%d material slot(s) back to the base',
+    'Rendering all puts the scene back.',
+    'Preview All 8',
+    "Render all eight headings through the final render's own code path and put them on one labelled page. The page is an extra file - the frames the .dat uses are not touched",
+    '%s - the same camera as the final render',
+    'showing variant %s',
+    'This project was saved by a newer version of the kit. Nothing was changed',
     # operators
     "Build Rig",
     "Create the Simutrans camera and sun and set the render options this pakset needs",
@@ -928,6 +989,126 @@ SPANISH = {
         '%s - %d archivo(s). No se ha subido nada',
     '%d error(s) - the package was NOT written':
         '%d error(es): el paquete NO se ha escrito',
+
+    # --- fase 3: composiciones, hoja de contactos, restauración
+    'Consists':
+        'Composiciones',
+    'Consist':
+        'Composición',
+    'Consist name':
+        'Nombre de la composición',
+    'What this formation is called. It is for you and the catalogue - the engine has no such thing as a formation':
+        'Cómo se llama esta formación. Es para ti y para el catálogo: el motor no tiene el concepto de formación',
+    'Describe the train; the coupling':
+        'Describe el tren; las reglas de',
+    'rules are worked out from it.':
+        'enganche salen de ahí.',
+    'No consists yet.':
+        'Aún no hay composiciones.',
+    'Empty.':
+        'Vacía.',
+    'Runs either way':
+        'Circula en ambos sentidos',
+    'The same cars may run in the mirrored order too':
+        'Los mismos coches pueden circular también en el orden inverso',
+    'Add Consist':
+        'Añadir composición',
+    'Describe a train: which vehicles, in what order. The coupling rules are worked out from it':
+        'Describe un tren: qué vehículos y en qué orden. Las reglas de enganche se calculan a partir de ahí',
+    'Copy the selected formation, vehicles and all':
+        'Copia la formación seleccionada, con sus vehículos',
+    'Rename the selected formation':
+        'Renombra la formación seleccionada',
+    'Delete the selected formation':
+        'Borra la formación seleccionada',
+    'Add Vehicle':
+        'Añadir vehículo',
+    'Put a vehicle at the back of the selected formation':
+        'Pone un vehículo al final de la formación seleccionada',
+    'Vehicle':
+        'Vehículo',
+    'The name= of a vehicle or a variant to put in this train':
+        'El name= de un vehículo o de una variante para meter en este tren',
+    'Goes':
+        'Va',
+    'At least':
+        'Al menos',
+    '0 makes it optional - the train is buildable without it':
+        '0 lo hace opcional: el tren se puede construir sin él',
+    'At most':
+        'Como mucho',
+    'More than 1 makes it a repeatable section, and lets it couple to itself':
+        'Más de 1 lo convierte en una sección repetible y le permite engancharse consigo mismo',
+    'Move':
+        'Mover',
+    'Move a vehicle up or down the train':
+        'Mueve un vehículo hacia delante o hacia atrás en el tren',
+    'Remove vehicle':
+        'Quitar vehículo',
+    'Take a vehicle out of the formation':
+        'Saca un vehículo de la formación',
+    'Check Consists':
+        'Comprobar composiciones',
+    'Impossible formations, broken references, and vehicles that could never lead or end a train':
+        'Formaciones imposibles, referencias rotas y vehículos que nunca podrían encabezar ni cerrar un tren',
+    'Show Constraints':
+        'Ver enganches',
+    'Work out the coupling rules these formations imply, and show them. Nothing is written':
+        'Calcula las reglas de enganche que implican estas formaciones y las muestra. No se escribe nada',
+    'Apply to this vehicle':
+        'Aplicar a este vehículo',
+    'Put the worked-out coupling rules for the CURRENT object into its two constraint fields':
+        'Pone las reglas de enganche calculadas para el objeto ACTUAL en sus dos campos de restricción',
+    'Consist %s added (%d in all)':
+        'Composición %s añadida (%d en total)',
+    'No consist selected':
+        'No hay ninguna composición seleccionada',
+    'No consists to work from':
+        'No hay composiciones de las que partir',
+    'Type a vehicle name first':
+        'Escribe primero el nombre de un vehículo',
+    '%s added to %s':
+        '%s añadido a %s',
+    '%d consist(s), nothing wrong':
+        '%d composición(es); nada mal',
+    '%d error(s) - fix these before applying':
+        '%d error(es): corrígelos antes de aplicar',
+    '%s: Prev=%s Next=%s':
+        '%s: Ant=%s Sig=%s',
+    '%s: %d to add, %d to remove, %d already right':
+        '%s: %d por añadir, %d por quitar, %d ya correctos',
+    '%d vehicle(s). Nothing was written':
+        '%d vehículo(s). No se ha escrito nada',
+    '%r is not in any consist, so there is nothing to apply':
+        '%r no está en ninguna composición, así que no hay nada que aplicar',
+    'Applied':
+        'Aplicada',
+    'Applied: %s':
+        'Aplicada: %s',
+    'The variant currently painted onto the scene. Applying one really does change the materials - it is not a preview':
+        'La variante pintada ahora mismo en la escena. Aplicar una cambia los materiales de verdad: no es una vista previa',
+    'The scene really is repainted.':
+        'La escena está repintada de verdad.',
+    'Back to base':
+        'Volver a la base',
+    'Put the base materials back. Applying a variant really does repaint the scene - this undoes it':
+        'Devuelve los materiales base. Aplicar una variante repinta la escena de verdad; esto lo deshace',
+    'Nothing to undo - no variant is applied':
+        'Nada que deshacer: no hay ninguna variante aplicada',
+    '%d material slot(s) back to the base':
+        '%d hueco(s) de material devueltos a la base',
+    'Rendering all puts the scene back.':
+        'Renderizar todas deja la escena como estaba.',
+    'Preview All 8':
+        'Vista previa de las 8',
+    "Render all eight headings through the final render's own code path and put them on one labelled page. The page is an extra file - the frames the .dat uses are not touched":
+        'Renderiza las ocho orientaciones por el mismo camino de código que el render final y las pone en una hoja etiquetada. La hoja es un archivo aparte: no se tocan los fotogramas que usa el .dat',
+    '%s - the same camera as the final render':
+        '%s - la misma cámara que el render final',
+    'showing variant %s':
+        'mostrando la variante %s',
+    'This project was saved by a newer version of the kit. Nothing was changed':
+        'Este proyecto se guardó con una versión más nueva del kit. No se ha cambiado nada',
 }
 
 

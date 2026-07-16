@@ -39,13 +39,15 @@ import sys
 
 try:
     from . import rig
-    from ..core import colors, night, paksets, sheet, variants
+    from ..core import (colors, contact, night, paksets, scenecheck, sheet,
+                        variants)
 except ImportError:
     _HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if _HERE not in sys.path:
         sys.path.insert(0, _HERE)
     from addon import rig
-    from core import colors, night, paksets, sheet, variants
+    from core import (colors, contact, night, paksets, scenecheck, sheet,
+                      variants)
 
 
 # --- variants on a real scene ------------------------------------------------
@@ -184,3 +186,148 @@ def preview_report(bpy, png, props):
 def is_stale(bpy, props, recorded):
     """Has anything the render depends on moved since `recorded`?"""
     return recorded is None or recorded != fingerprint(bpy, props)
+
+
+def preview_sheet(bpy, out_dir, props, dirs=8):
+    """All eight headings, through the final render's own path, on one page.
+
+    -> (contact_png, frames, placement, fingerprint)
+
+    Same two functions as preview(): prepare_directions() and render_one_step().
+    The contact sheet is assembled afterwards, by core/contact.py, FROM the
+    finished frames - it reads them and writes a separate image. The frames the
+    .dat will point at are not touched, and no second renderer exists to drift.
+    """
+    plan, codes = rig.prepare_directions(
+        bpy, out_dir, props.pakset, dirs=int(dirs),
+        basename="%s_preview" % props.basename,
+        align_offset=tuple(props.align_offset))
+    frames = [rig.render_one_step(bpy, plan, code) for code in codes]
+
+    pak = paksets.get(props.pakset)
+    dest = os.path.join(out_dir, "%s_contact.png" % props.basename)
+    png, place = contact.build(frames, pak.tile_px, dest, cols=4)
+    return png, frames, place, fingerprint(bpy, props)
+
+
+def sheet_report(bpy, frames, place, props, dirs=8):
+    """What the contact sheet can tell you -> (str, ...).
+
+    Every check here is an existing one, run against the real frames.
+    """
+    out = list(contact.report(frames, place, dirs))
+
+    mark = rig.warning_mark()
+    rig.warn_if_clipped(frames, "preview")
+    out.extend(rig.warnings_since(mark))
+
+    sizes = set()
+    for _code, png in frames:
+        try:
+            w, h, _a, _px = sheet.read_png(png)
+            sizes.add((w, h))
+        except (OSError, ValueError):
+            out.append("could not read %s" % os.path.basename(png))
+    if len(sizes) > 1:
+        # Every frame must be one img_size cell; image_writer.cc reads
+        # image=file.row.col as exactly img_size squared.
+        out.append("The headings are not all the same size (%s). The writer "
+                   "reads every image as one tile-sized square"
+                   % ", ".join("%dx%d" % s for s in sorted(sizes)))
+    return tuple(out)
+
+
+# --- doing something to every variant, and putting the scene back -------------
+
+class SceneRestore:
+    """Remember the material slots, put them back afterwards.
+
+    Applying a variant REWRITES material slots - that is not a choice, it is how
+    Blender assigns a material to a mesh, and phase 2 said so. What phase 2 did
+    not do was put them back: Render All Variants left the last variant applied,
+    so an artist who rendered a family found their scene painted in whichever
+    livery happened to be last, with no way to tell that from a scene they had
+    painted themselves.
+
+    So: a context manager that snapshots (object, slot index) -> material and
+    restores it. Used with `with`, it restores on the way out whether the body
+    finished, raised, or was cancelled - which are exactly the three cases where
+    leaving the scene wrong matters most.
+
+    IT REPORTS ITS OWN FAILURES. `problems` is not empty when something could not
+    be put back - an object deleted mid-run, a slot that moved. Silence there
+    would be the worst outcome: the artist believes the scene is theirs and it is
+    not.
+    """
+
+    def __init__(self, bpy):
+        self.bpy = bpy
+        self.slots = []
+        self.active = None
+        self.selected = ()
+        self.problems = []
+        self.restored = False
+
+    def __enter__(self):
+        self.snapshot()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.restore()
+        return False            # never swallow the exception
+
+    def snapshot(self):
+        bpy = self.bpy
+        self.slots = []
+        for ob in bpy.data.objects:
+            if ob.type != "MESH" or not getattr(ob.data, "materials", None):
+                continue
+            for i, mat in enumerate(ob.data.materials):
+                self.slots.append((ob.name, i, mat.name if mat else None))
+        self.active = (bpy.context.view_layer.objects.active.name
+                       if bpy.context.view_layer.objects.active else None)
+        self.selected = tuple(o.name for o in bpy.context.selected_objects)
+
+    def restore(self):
+        bpy = self.bpy
+        self.problems = []
+        for name, i, mat_name in self.slots:
+            ob = bpy.data.objects.get(name)
+            if ob is None:
+                self.problems.append("%s is gone - its materials were not "
+                                     "restored" % name)
+                continue
+            if not getattr(ob.data, "materials", None) or i >= len(ob.data.materials):
+                self.problems.append("%s has no material slot %d any more"
+                                     % (name, i))
+                continue
+            want = bpy.data.materials.get(mat_name) if mat_name else None
+            if mat_name and want is None:
+                self.problems.append("the material %r is gone, so %s slot %d "
+                                     "keeps what it has" % (mat_name, name, i))
+                continue
+            ob.data.materials[i] = want
+
+        for ob in bpy.context.selected_objects:
+            ob.select_set(False)
+        for name in self.selected:
+            ob = bpy.data.objects.get(name)
+            if ob is not None:
+                ob.select_set(True)
+        if self.active:
+            ob = bpy.data.objects.get(self.active)
+            if ob is not None:
+                bpy.context.view_layer.objects.active = ob
+
+        self.restored = not self.problems
+        return self.problems
+
+    def findings(self):
+        """What to tell the artist -> (Finding, ...). Reuses scenecheck's."""
+        if self.restored:
+            return (scenecheck.Finding(
+                scenecheck.INFORMATION, "restored",
+                "The scene is back as it was"),)
+        return tuple(scenecheck.Finding(scenecheck.WARNING, "not-restored", p)
+                     for p in self.problems)
+
