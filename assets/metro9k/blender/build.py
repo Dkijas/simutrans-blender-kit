@@ -129,22 +129,28 @@ def build_one(metro9k, car, constraints, install=True):
     p.author = metro9k.AUTHOR
     p.out_dir = SPRITES
 
-    # --- THE NUMBERS COME OUT OF THE SPEC, NOT OUT OF THIS FILE.
+    # --- WHERE THE NUMBERS COME FROM, HONESTLY.
     #
-    # spec.load() has already refused anything without a source, so a figure that
-    # somebody typed because it sounded right cannot reach the .dat through here.
-    # That is the entire point: we were handed a table captioned "valor recomendado"
+    # The unit-level figures below come from spec.load(), which has already refused
+    # anything without a source: that is why the table captioned "valor recomendado",
     # whose capacity (1260) and per-car length (17.83 m, which is just 107/6) were
-    # wrong, and both would have compiled perfectly.
+    # wrong, could not reach the .dat through them.
+    #
+    # The PER-CAR splits (power, weight, payload) do NOT come through the spec yet -
+    # they are literals in metro9k.py that spec.py never sees. That gap is real and it
+    # already cost us exactly once: this unit shipped a payload split summing to 186
+    # against a measured 178, and nothing caught it, because nothing was looking.
+    # build_all() now sums the split and checks it against the spec; routing the
+    # splits through spec.json per car is the proper fix and is still to do.
     spec = load_spec()
     p.waytype = "track"
     p.engine_type = "electric"
     p.speed = spec.value("speed")                  # measured
-    p.power = car.kilowatts                        # 3168 kW split over the 4 motored
-    p.weight = car.tonnes                          # cars; the mass is PROVISIONAL
+    p.power = car.kilowatts                        # per-car split, NOT spec-gated
+    p.weight = car.tonnes                          # per-car split, NOT spec-gated
     p.length = car.length
     p.freight = "Passagiere"
-    p.payload = car.seats                          # 1274 = 178 seated + 1096 standing
+    p.payload = car.seats                          # the SEATED figure only: 178 of 1274
     p.intro_year = spec.value("intro_year")        # measured
     p.cost = spec.value("cost") if car.cab else spec.value("cost") // 2   # PROVISIONAL
     p.runningcost = (spec.value("runningcost") if car.cab
@@ -195,8 +201,12 @@ def build_one(metro9k, car, constraints, install=True):
     shutil.copy(dat_path, os.path.join(DAT, "%s.dat" % car.key))
     if os.path.exists(pak):
         shutil.copy(pak, os.path.join(PAK, "%s.pak" % car.key))
+    # Save the painted flank and its light mask. The match MUST mirror the names
+    # livery_texture() gives them (metro9k.py names them car.key and car.key+"_mask");
+    # a stale "civia_%s" left over from the Civia matched nothing, so textures/
+    # silently stayed empty. Keep this in step with that file.
     for img in bpy.data.images:
-        if img.name.startswith("civia_%s" % car.key):
+        if img.name.startswith(car.key):
             img.filepath_raw = os.path.join(TEXTURES, "%s.png" % img.name)
             img.file_format = "PNG"
             img.save()
@@ -235,6 +245,33 @@ def main():
         print("--- %s (%s, %.2f m -> length %d)"
               % (car.key, car.name, car.metres, car.length))
         build_one(metro9k, car, cons)
+
+    if which == "all":
+        # The per-car splits are literals in metro9k.py that spec.py never sees, so
+        # this is where they meet the sourced totals. The unit once shipped a payload
+        # summing to 186 against a measured 178 - a whole missing car's worth of seats
+        # - and nothing noticed, because nothing added them up. Now something does.
+        spec = load_spec()
+        seated = spec.value("seated")
+        got = sum(c.seats for c in metro9k.UNIT)
+        check("the payload split sums to the measured seated figure", got == seated,
+              "spec says %d, the six cars carry %d" % (seated, got))
+
+        watts = spec.value("power_total_kw")
+        got_kw = sum(c.kilowatts for c in metro9k.UNIT)
+        check("the power split sums to the derived total", got_kw == watts,
+              "spec says %d kW, the six cars carry %d kW" % (watts, got_kw))
+
+        tonnes = spec.value("weight_total_t")
+        got_t = sum(c.tonnes for c in metro9k.UNIT)
+        check("the weight split sums to the declared total", got_t == tonnes,
+              "spec says %d t, the six cars carry %d t" % (tonnes, got_t))
+
+        # The art is victor_18993's. The kit used to write its own name here, and
+        # the released MadridMetroS9000.pak still carries it.
+        check("every car credits the artist, not the tool",
+              metro9k.AUTHOR == "victor_18993",
+              "AUTHOR is %r" % metro9k.AUTHOR)
 
     print("\nout: %s" % _PROJ)
     if FAILED:

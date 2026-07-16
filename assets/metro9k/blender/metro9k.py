@@ -1,4 +1,4 @@
-"""Renfe Civia S/465 for pak128 - shared components.
+"""Metro de Madrid Serie 9000 for pak128 - shared components.
 
 Everything here is built with the add-on's own API. Nothing is reimplemented:
 
@@ -21,8 +21,8 @@ is ONLY the day->night colour swap in display/simgraph16.cc. Therefore:
   * "headlights only on the car that is leading" is not expressible. The sprite is
     fixed; a cab car shows its lamps whether it leads or trails.
   * So each cab gets what a real cab has: white headlights AND red tail lights on
-    the same front (look at references/civia-side1.jpg). Whichever end leads, the
-    picture is true.
+    the same front (look at references/real_serie9000_1.jpg). Whichever end leads,
+    the picture is true.
   * The interior glow is per-window: some panes are painted the engine's window
     colour (they light up), some are painted a plain dark grey that is NOT in the
     light table (they never do). That is what stops the band becoming one uniform
@@ -30,16 +30,18 @@ is ONLY the day->night colour swap in display/simgraph16.cc. Therefore:
 
 DIMENSIONS - what is measured and what is not
 ---------------------------------------------
-Measured (es.wikipedia.org/wiki/Civia, and the works drawing in references/):
-    465 = A1-A5-A3-A4-A2, 98.05 m over five cars
-    driving car 22.4 m (the two-car 462 is 44.8 m)
-    A3 20.75 m (the three-car 463 is 65.55 m, minus the two driving cars)
-    A4 14.75 m, A5 17.75 m (from the 464 = 80.30 m and the 465 = 98.05 m)
-    width 2.94 m, height 4.265 m, 120 km/h, 2200 kW, 157.3 t, 997 seats/standing
-APPROXIMATED (say so, do not dress it up):
+Measured (es.wikipedia.org/wiki/Series_7000_y_9000, and the photographs in
+references/). The full sourcing, figure by figure, is in spec.json:
+    9000 = M-R-S-S-R-M, 107 m over six cars
+    cab car (M) 18.425 m; the four intermediates (R, S) 16.880 m
+    width 2.8 m, height 3.65 m, 110 km/h, 3168 kW (198 kW x 16 motors)
+    capacity 1274 = 178 seated + 1096 standing; 1500 Vcc; in service 2006
+PROVISIONAL / APPROXIMATED (say so, do not dress it up):
+    * weight 200 t is a GUESS - AnsaldoBreda never published the mass. spec.json
+      marks it provisional; balance it before anyone plays with it.
     * a tile is taken as 25 m. Simutrans Standard has no metres-per-tile; what
       MUST hold is sprite length == length/16 of a tile, or the cars gap/overlap.
-    * bogie positions: the works drawing is not dimensioned. Standard placement.
+    * bogie positions: not dimensioned anywhere. Standard placement.
     * the two "fat" factors below: true scale reads as a stick at 128 px, so pak
       art is drawn wide - but overdo it and the roof fouls the catenary. These
       were set by standing the train next to pak128's own 620 railcar in a
@@ -213,7 +215,10 @@ class Car:
 # Every number below is split from a MEASURED total, and the split itself is the
 # approximation - AnsaldoBreda does not publish a per-car breakdown of anything.
 #   power     3168 kW = 198 kW x 16 motors, put on the four motored cars (M, R)
-#   capacity  1274 = 178 seated + 1096 standing, split by floor area
+#   capacity  the .dat payload carries the SEATED figure only: 178, measured.
+#             The per-car split is the same one the 7000 already ships, because
+#             the two share the AnsaldoBreda/Pininfarina carbody - so the split
+#             invents nothing new, and the two units agree seat for seat.
 #   weight    NOT PUBLISHED ANYWHERE. 200 t is a guess and spec.json says so.
 # Four double doors per car, per side, which is what the photographs show.
 DOORS_6 = (0.16, 0.38, 0.62, 0.84)
@@ -222,13 +227,13 @@ DOORS_CAB = (0.30, 0.50, 0.70, 0.88)     # the nose eats the first door bay
 CAB_A = Car("m9k_cab_a", "MadridMetro_S9000_CabA", 18.425, cab=True, panto=True,
             doors=DOORS_CAB, seats=28, tonnes=38, kilowatts=792)
 INT_R1 = Car("m9k_int_r1", "MadridMetro_S9000_R1", 16.88, cab=False, panto=False,
-             doors=DOORS_6, seats=32, tonnes=33, kilowatts=792)
+             doors=DOORS_6, seats=30, tonnes=33, kilowatts=792)
 INT_S1 = Car("m9k_int_s1", "MadridMetro_S9000_S1", 16.88, cab=False, panto=False,
-             doors=DOORS_6, seats=33, tonnes=29, kilowatts=0)
+             doors=DOORS_6, seats=31, tonnes=29, kilowatts=0)
 INT_S2 = Car("m9k_int_s2", "MadridMetro_S9000_S2", 16.88, cab=False, panto=False,
-             doors=DOORS_6, seats=33, tonnes=29, kilowatts=0)
+             doors=DOORS_6, seats=31, tonnes=29, kilowatts=0)
 INT_R2 = Car("m9k_int_r2", "MadridMetro_S9000_R2", 16.88, cab=False, panto=False,
-             doors=DOORS_6, seats=32, tonnes=33, kilowatts=792)
+             doors=DOORS_6, seats=30, tonnes=33, kilowatts=792)
 CAB_B = Car("m9k_cab_b", "MadridMetro_S9000_CabB", 18.425, cab=True, panto=True,
             doors=DOORS_CAB, seats=28, tonnes=38, kilowatts=792,
             reversed_=True)          # the tail cab faces the other way. See Car.
@@ -306,9 +311,12 @@ def livery_texture(car, decals=True):
     decals=False leaves the logos and the unit number off, so the livery can be
     reused or relettered. That is why they are a separate pass and not baked in.
     """
-    img, px = rig.new_texture(bpy, "m9k_%s" % car.key, TEX_W, TEX_H,
+    # car.key already carries the "m9k_" prefix, so name the images by it directly:
+    # "m9k_%s" % car.key would double it ("m9k_m9k_cab_a"), which leaks into the
+    # saved texture filenames. build.py's save filter matches on car.key to match.
+    img, px = rig.new_texture(bpy, car.key, TEX_W, TEX_H,
                               background=BODY)
-    mimg, mpx = rig.new_texture(bpy, "m9k_%s_mask" % car.key, TEX_W, TEX_H,
+    mimg, mpx = rig.new_texture(bpy, "%s_mask" % car.key, TEX_W, TEX_H,
                                 background=(0, 0, 0), colorspace="Non-Color")
 
     def rect(x0, y0, x1, y1, rgb, light=False):
