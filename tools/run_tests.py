@@ -283,6 +283,12 @@ def suite_asset_metro9k():
                     extra=("--factory-startup",), script_args=("all",))
 
 
+def suite_asset_metro2000a():
+    """The Metro 2000A, likewise. The narrow-gauge M+R pair - see its README."""
+    return _blender("../assets/metro2000a/blender/build.py", "METRO2000A_OK",
+                    extra=("--factory-startup",), script_args=("all",))
+
+
 def suite_paks():
     """Compile the .pak the game suites load, from the art THIS RUN rendered.
 
@@ -479,6 +485,20 @@ def suite_civia():
                 (r"CIVIA465_TESTS_FAILED", r"Traceback"), 300, "civia")
 
 
+def suite_metro2000a():
+    """The Serie 2000A: sheets, clipping, reserved colours, the branching couplings.
+
+    Unlike suite_civia, this one FAILS rather than skips when makeobj is absent -
+    see the test's docstring. A skip is not a pass, and the .pak check is the whole
+    point of running it.
+    """
+    return _run([sys.executable,
+                 os.path.join("assets", "metro2000a", "tests",
+                              "test_metro2000a.py")],
+                ROOT, r"\bMETRO2000A_TESTS_OK\b",
+                (r"METRO2000A_TESTS_FAILED", r"Traceback"), 300, "metro2000a")
+
+
 def _game128(scenario, sentinel, name):
     """The pak128 testbed: a real pakset, in a game root built OUTSIDE the repo.
 
@@ -575,6 +595,7 @@ SUITES = {
     "paks": suite_paks,
     "asset-civia": suite_asset_civia,
     "asset-metro9k": suite_asset_metro9k,
+    "asset-metro2000a": suite_asset_metro2000a,
     "catalogue": suite_game_catalogue,
     "running": suite_game_running,
     "hopper": suite_game_hopper,
@@ -587,6 +608,7 @@ SUITES = {
     "game-infra": suite_game_infra,
     "game-all": suite_game_all,
     "civia": suite_civia,
+    "metro2000a": suite_metro2000a,
     "game-civia": suite_game_civia,
     "game-metro9k": suite_game_metro9k,
     "game-metro9k-line": suite_game_metro9k_line,
@@ -606,7 +628,10 @@ ORDER = ("core", "templates", "scenecheck", "variants", "package",
          "catalogue", "running", "hopper", "tunnel-game", "stop", "bridge-game",
          "factory-game", "house", "road", "game-infra", "game-all",
          # the game, against a real pakset - these build and install their own
+         # .pak. Each asset-* renders the art and the suite after it checks what was
+         # rendered, so those pairs must stay adjacent and in that order.
          "asset-civia", "civia", "asset-metro9k",
+         "asset-metro2000a", "metro2000a",
          "game-civia", "game-metro9k", "game-metro9k-line")
 
 

@@ -77,6 +77,19 @@ TW = PAK.tile_world
 AUTHOR = "victor_18993"
 METRES_PER_TILE = 25.0          # APPROXIMATION. See the module docstring.
 
+# The FLAT CONTOUR - the same treatment adopted on the 2000A. One dark, cool
+# near-black (#16181C), far from all four reserved colours, inked 1 px around the
+# silhouette after the render so the vehicle reads as a defined sprite instead of
+# dissolving into the depot. See core.sheet.outline_cells; applied from build.py
+# after Render Sheet and before Compile .pak. Grows outward only, so the body's
+# palette-exact pixels are untouched.
+OUTLINE = (0x16, 0x18, 0x1C)
+
+
+def apply_outline(sheet_png):
+    """Ink the flat contour onto a finished sheet, in place. -> the (r,g,b) inked."""
+    return sheet.add_outline_file(sheet_png, PAK.tile_px, OUTLINE)
+
 # --------------------------------------------------------------------- palette
 # The brief's palette, checked against references/civia-elevation.png and the
 # photographs. The purple band and the red pinstripes are in the drawing and are
@@ -282,10 +295,14 @@ def livery_texture(car, decals=True):
         rig.paint_rect(mpx, TEX_W, x0 * TEX_W, y0 * TEX_H, x1 * TEX_W, y1 * TEX_H,
                        (255, 255, 255) if light else (0, 0, 0))
 
-    # ---- bodywork, with tonal variation. y=0 is the BOTTOM of the car.
+    # ---- bodywork, SHADED FOR VOLUME. y=0 is the BOTTOM. The top already caught the
+    # light; now the lower body gets the same gradient the 2000A has - shadow at the
+    # sill and a highlight up under the windows - so the flank reads as a rounded steel
+    # side rather than a flat slab. Same pass the 9000 got.
     rect(0.00, 0.86, 1.00, 1.00, BODY_HI)      # the top of the flank catches light
     rect(0.00, 0.21, 1.00, 0.50, BODY)
-    rect(0.00, 0.21, 1.00, 0.26, BODY_SH)      # ...and it darkens towards the skirt
+    rect(0.00, 0.21, 1.00, 0.29, BODY_SH)      # shadow down along the sill
+    rect(0.00, 0.45, 1.00, 0.50, BODY_HI)      # highlight up under the window band
 
     # ---- the underframe
     rect(0.00, 0.00, 1.00, 0.13, DEEP)
@@ -298,7 +315,12 @@ def livery_texture(car, decals=True):
     rect(0.00, 0.845, 1.00, 0.86, RED)         # and the one along the roofline
 
     # ---- the window band. NOT pure black: the brief is right, and so is the art.
+    # FRAMED top and bottom and divided by mullions now, so the ribbon reads as a row
+    # of windows with depth rather than a flat dark smear - the same pass the 2000A and
+    # 9000 got.
     rect(0.00, 0.55, 1.00, 0.82, GLASS)
+    rect(0.00, 0.806, 1.00, 0.82, EQUIP_DET)       # header rail along the top
+    rect(0.00, 0.55, 1.00, 0.562, DARK)            # sill rail along the bottom
 
     # ---- the panes. Alternate lit and unlit so the night band is not a stripe.
     x, i = 0.05, 0
@@ -307,8 +329,10 @@ def livery_texture(car, decals=True):
         if w < 0.03:
             break
         lit = (i % 3) != 1                     # two lit, one dark, repeating
-        rect(x, 0.585, x + w, 0.785, LIT_PANE if lit else GLASS_HI, light=lit)
+        rect(x, 0.585, x + w, 0.785, LIT_PANE if lit else GLASS, light=lit)
         rect(x, 0.585, x + w, 0.60, GLASS_DEEP)        # a shadow under the pane
+        rect(x, 0.765, x + w, 0.785, GLASS_HI)         # a reflection along the top
+        rect(x - 0.007, 0.585, x, 0.785, EQUIP_DET)    # the mullion, left of the pane
         x += 0.095
         i += 1
 

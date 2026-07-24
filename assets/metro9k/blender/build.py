@@ -173,6 +173,12 @@ def build_one(metro9k, car, constraints, install=True):
     check("%s: the sheet exists" % car.key, os.path.exists(sheet_png))
     check("%s: the .dat exists" % car.key, os.path.exists(dat_path))
 
+    # --- the FLAT CONTOUR, inked onto the rendered sheet before makeobj sees it,
+    # so the reserved-colour report below validates the sheet the .pak will carry.
+    inked = metro9k.apply_outline(sheet_png)
+    check("%s: the flat contour was inked" % car.key,
+          inked == metro9k.OUTLINE, str(inked))
+
     # --- the reserved-colour report, split the way the brief asks
     wanted, accidental = rig.reserved_colour_report(bpy, sheet_png)
     print("       intentional reserved colours: %s"

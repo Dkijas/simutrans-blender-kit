@@ -1,0 +1,232 @@
+{
+  "name": "MadridMetro_S2000A",
+  "display_name": "Metro de Madrid Serie 2000A",
+  "pakset": "pak128",
+
+  "_honesty": [
+    "The first series in this collection that is NOT an AnsaldoBreda wide-gauge unit,",
+    "and the first built from a works-grade drawing rather than a photograph. Two",
+    "sources carry it: the CRTM's official history (a scale side elevation of M-2004",
+    "in the 1980s red-white scheme) and Via Libre's April 2001 ficha (the technical",
+    "table). Almost everything below is measured off one of those two.",
+    "",
+    "What is NOT sourced, and is marked: the prices, as always. And the WEIGHT is",
+    "sourced but not to the fact Simutrans wants - see weight_unit_t. That distinction",
+    "matters more than a guess would, because a wrong-but-cited number is the kind",
+    "this spec exists to stop.",
+    "",
+    "Width and height are the one weak spot. The Via Libre ficha does NOT publish",
+    "them; the only source is Wikipedia, which this project has already caught in",
+    "four errors on this very series. They are the numbers the whole model turns on,",
+    "so they are named here rather than buried."
+  ],
+
+  "facts": {
+    "speed": {
+      "value": 65,
+      "kind": "measured",
+      "source": "https://vialibre-ffe.com/pdf/11419_pdf_02.pdf p.35 ficha 'CARACTERISTICAS TECNICAS DE LA SERIE 2000' - 'Velocidad maxima 65 km/h'. Corroborated by https://www.crtm.es/media/161812/metro_historico_historia_trenes.pdf entry 10 'Coche 2.000 Serie A ... Alcanza una velocidad maxima de 65 km/h'",
+      "note": "The Serie B (7th batch, 1997) is 70 km/h. Two trains, two figures - see the CRTM entry 11."
+    },
+    "motors_per_motor_car": {
+      "value": 4,
+      "kind": "measured",
+      "source": "https://vialibre-ffe.com/pdf/11419_pdf_02.pdf p.35 ficha - 'Motores por coche motor 4'"
+    },
+    "axle_arrangement": {
+      "value": "Bo'Bo'+2'2'",
+      "kind": "measured",
+      "source": "https://vialibre-ffe.com/pdf/11419_pdf_02.pdf p.35 ficha - \"Disposicion de ejes Bo'Bo\\\"+2\\\"2\\\" (M-R)\"",
+      "note": "This is what puts ALL the power in the M and none in the R: the M's two bogies are both driven, the R's two are not. The split below is not a choice, it is this line."
+    },
+    "power_total_kw": {
+      "value": 594,
+      "kind": "measured",
+      "source": "https://vialibre-ffe.com/pdf/11419_pdf_02.pdf p.35 ficha - 'Potencia unidad 594 kW (M-R) y 1.188 kW (M-M)'",
+      "note": "594 kW is the whole M-R pair. The 1.188 kW figure is the M-M preserie (6 units, 1985), which this asset does not model."
+    },
+    "length_unit_m": {
+      "value": 29.44,
+      "kind": "measured",
+      "source": "https://vialibre-ffe.com/pdf/11419_pdf_02.pdf p.35 ficha - 'Longitud 29.440 mm'",
+      "note": "The ficha's 'Longitud' is the M-R UNIT, not a car. It publishes no per-car length."
+    },
+    "length_car_m": {
+      "value": 14.72,
+      "kind": "derived",
+      "formula": "length_unit_m / 2 = 29.44 / 2 = 14.72",
+      "source": "length_unit_m. The halving assumes M and R are the same length; corroborated independently by https://es.wikipedia.org/wiki/Serie_2000_(Metro_de_Madrid) which states 14,72 m per car, and by the CRTM elevation, where the M's body and the R's are drawn the same length."
+    },
+    "width_m": {
+      "value": 2.3,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Serie_2000_(Metro_de_Madrid) - ancho de caja 2,30 m (galibo estrecho)",
+      "note": "SINGLE-SOURCED AND WEAK. Via Libre's ficha does not publish width or height, and Wikipedia has been caught with four wrong figures on this series (12 preserie units for 6; the 2000B's year; and two more). This number and height_m are what make the 2000A a different train from the 7000 (2,808 m), so they carry the model. Confirm against a works drawing before anyone treats them as gospel."
+    },
+    "height_m": {
+      "value": 3.34,
+      "kind": "measured",
+      "source": "https://es.wikipedia.org/wiki/Serie_2000_(Metro_de_Madrid) - altura 3,34 m",
+      "note": "Same weakness as width_m, same reason. The 7000 is 3,65 m."
+    },
+    "payload_seated_per_car": {
+      "value": 24,
+      "kind": "measured",
+      "source": "https://vialibre-ffe.com/pdf/11419_pdf_02.pdf p.35 ficha - 'Plazas por coche (remesas 1 a 6) 111 de pie (6v/m') y 24 sentados'"
+    },
+    "payload_standing_per_car": {
+      "value": 111,
+      "kind": "measured",
+      "source": "https://vialibre-ffe.com/pdf/11419_pdf_02.pdf p.35 ficha - same line, '111 de pie (6 v/m2)'"
+    },
+    "payload_seated": {
+      "value": 48,
+      "kind": "derived",
+      "formula": "payload_seated_per_car * 2 cars = 24 * 2 = 48",
+      "source": "payload_seated_per_car, formation",
+      "note": "The .dat carries the SEATED figure, which is the convention the 9000 and 7000 shipped with. The real total is capacity_total below."
+    },
+    "capacity_total": {
+      "value": 270,
+      "kind": "derived",
+      "formula": "(payload_seated_per_car + payload_standing_per_car) * 2 cars = (24 + 111) * 2 = 270",
+      "source": "payload_seated_per_car, payload_standing_per_car",
+      "note": "Per M-R pair. A six-car train is three pairs: 810."
+    },
+    "weight_unit_t": {
+      "value": 45,
+      "kind": "measured",
+      "source": "https://vialibre-ffe.com/pdf/11419_pdf_02.pdf p.35 ficha - 'Peso coche en servicio (remesas 1 a 6) 26.200 Kgr (M) y 19.452 Kgr. (R)'. 26.200 + 19.452 = 45.652 kg, rounded to 45 t (the split below is 26 + 19).",
+      "note": "READ THIS BEFORE TRUSTING IT. The ficha publishes 'peso EN SERVICIO', and Simutrans's weight= is the EMPTY vehicle - the engine adds payload mass on top. No source publishes the tare for any Metro de Madrid series, so this is the closest published fact, not the right one. If 'en servicio' includes a passenger allowance then this train is heavy and its acceleration is wrong. It is still a large improvement on the 7000/9000, whose 200 t is a pure guess with no source at all."
+    },
+    "voltage_v": {
+      "value": 600,
+      "kind": "measured",
+      "source": "https://vialibre-ffe.com/pdf/11419_pdf_02.pdf p.35 ficha - 'Tension de alimentacion 600 V'",
+      "note": "Simutrans models no voltage: a vehicle is 'electric' and wants catenary, and that is all. This fact is here because it is true and because it is why the 2000A never ran with a 7000, not because the .dat can express it."
+    },
+    "current_collection": {
+      "value": "catenary + pantograph",
+      "kind": "measured",
+      "source": "the CRTM elevation of M-2004 (https://www.crtm.es/media/161812/metro_historico_historia_trenes.pdf, entry 10) draws a single-arm pantograph on the motor car's roof",
+      "note": "Madrid has no third rail. The pantograph does NOT distinguish this series from any other - every Metro de Madrid series has one."
+    },
+    "gauge_class": {
+      "value": "galibo estrecho",
+      "kind": "measured",
+      "source": "https://www.crtm.es/media/161812/metro_historico_historia_trenes.pdf entry 10 - 'Es el primer material movil de galibo estrecho construido para sustituir al material movil clasico'",
+      "note": "Narrow LOADING gauge, not narrow track gauge: the ficha gives 'Ancho de via 1.445 mm', the same as the wide-gauge lines. Simutrans has neither concept; this is why the model is narrower, not why the waytype differs."
+    },
+    "intro_year": {
+      "value": 1985,
+      "kind": "measured",
+      "source": "https://vialibre-ffe.com/pdf/11419_pdf_02.pdf p.33 - 'El 25 de enero de 1985 se ponia en servicio en la linea II, Cuatro Caminos-Ventas, los primeros trenes de la serie 2000'. Corroborated by the CRTM entry 10: 'Puesta en funcionamiento en 1985'"
+    },
+    "retire_year": {
+      "value": 2999,
+      "kind": "measured",
+      "source": "still in service. https://www.crtm.es/media/161812/metro_historico_historia_trenes.pdf entry 10 - 'Sigue en servicio en 2009', and the fleet still works Line 1 in 2026",
+      "note": "2999 is the engine's never-retire idiom, and it is what the 7000 and 9000 use. A withdrawal around 2027 has been reported but is a forecast, and a forecast is not a retire_year."
+    },
+    "doors_per_side_per_car": {
+      "value": 3,
+      "kind": "reference",
+      "source": "counted on the CRTM's scale elevation of M-2004, rendered from https://www.crtm.es/media/161812/metro_historico_historia_trenes.pdf at 1200 dpi (clip 288,183-480,226). Three solid red door bays across the flank, each a double leaf. sha256 of the rendered PNG: 2a45819dd18b999eb1764099348ffb25 (first 32 hex)",
+      "note": "The 7000 has four. This is the second thing you see after the size."
+    },
+    "door_centres": {
+      "value": [0.23, 0.514, 0.791],
+      "kind": "reference",
+      "source": "measured on the same 1200 dpi render of the CRTM elevation. Body spans x=147..2912 px at the window line; the three red door bays span 621-947, 1406-1732 and 2173-2499, giving centres at 0.2303, 0.5141 and 0.7913 of the car",
+      "note": "Nearly even, which is not what a cab car usually does - the cab sits in the last ~0.15 and the doors simply do not retreat from it. Measured, not assumed."
+    },
+    "livery": {
+      "value": "rojo-blanco",
+      "kind": "measured",
+      "source": "https://www.crtm.es/media/161812/metro_historico_historia_trenes.pdf - the elevation of M-2004 is drawn in it, and the neighbouring caption reads 'Uno de los mas vistosos fue el esquema rojo-blanco implantado en la decada de los ochenta'. Via Libre p.33 confirms the series ran three schemes: 'blanco y naranja, blanco y rojo y blanco y azul'",
+      "note": "Chosen over the current blanco-y-azul on purpose: the 7000 and the 9000 are already white-and-blue, and a third white-and-blue train is the problem this series exists to avoid. The red-white is period-correct for the 1980s, officially drawn, and unmistakable."
+    },
+    "body_colour": {
+      "value": "#FFFFFF",
+      "kind": "reference",
+      "source": "sampled off the CRTM elevation's bodywork, which is drawn pure white. Not taken from a photograph on purpose: station lighting contaminates every underground photo - the same Serie 7000 bodywork samples neutral (R-B = -2) in daylight at Lago and warm cream underground, and in one 9000 photo the platform FLOOR, which is grey, reads warmer (R-B = +62) than the train (+44). A drawing has no lamps in it."
+    },
+    "red_colour": {
+      "value": "#CE1126",
+      "kind": "reference",
+      "source": "sampled off the CRTM elevation's door bays and waist stripes at 1200 dpi"
+    },
+    "window_colour": {
+      "value": "#57656F",
+      "kind": "engine",
+      "source": "descriptor/image.cc:36 rgbtab[16] 0x57656F - 'Dark windows, lit yellowish at night'"
+    },
+    "headlight_colour": {
+      "value": "#E3E3FF",
+      "kind": "engine",
+      "source": "descriptor/image.cc:46 rgbtab[26] 0xE3E3FF - 'Nearly white light at day, yellowish light at night'"
+    },
+    "length_carunits": {
+      "value": 7,
+      "kind": "derived",
+      "formula": "length_car_m / metres_per_carunit = 14.72 / 2.11 = 6.98 -> 7, where metres_per_carunit is the scale the published sisters already fix: the 7000's 16.88 m intermediate is length 8, so 16.88/8 = 2.11 m per carunit",
+      "source": "length_car_m; assets/metro7k/spec.json length_intermediate_m and length_carunits",
+      "note": "SEVEN, not eight, and this is the first vehicle in the collection that is not 8. It is safe because every car of THIS unit is 7: the engine trails each car by the length of the one in FRONT (simconvoi.cc:428) while the art sits centred, so unequal lengths inside one convoy open the joints - and there are none here. A 2000A never couples to a 7000, so the two need not agree. 80 of pak128's 505 rail vehicles are already not length 8."
+    },
+    "cost": {
+      "value": 900000,
+      "kind": "provisional",
+      "source": "a guess, in cents. Set well below the 7000's 2.000.000 because this is a 1985 two-car unit and that is a 2002 six-car one; the ratio is a balance decision, not a price anyone published."
+    },
+    "runningcost": {
+      "value": 90,
+      "kind": "provisional",
+      "source": "a guess, per km; a balance figure, scaled from the 7000's 200 by the same reasoning as cost."
+    }
+  },
+
+  "reference": {
+    "drawing": "https://www.crtm.es/media/161812/metro_historico_historia_trenes.pdf",
+    "note": [
+      "The best reference this project has had for any series, and the first that is",
+      "not a photograph. It is the CRTM's own history of Metro de Madrid's trains,",
+      "with side elevations by Miguel Angel Delgado and technical commentary by Manuel",
+      "Gonzalez Marquez, an engineer in Metro's Material Movil department. Entry 10 is",
+      "the 2000 Serie A, drawn as M-2004 in the red-white scheme.",
+      "",
+      "WHAT IT IS GOOD FOR, AND WHAT IT IS NOT. It is a paint scheme drawing, so it is",
+      "trusted here for LAYOUT - where the doors fall, where the stripes sit, what the",
+      "cab end is shaped like - and for COLOUR, which is why body_colour and",
+      "red_colour are 'reference'. It is NOT trusted for DIMENSIONS: nothing on it is",
+      "dimensioned, and measuring an illustration and calling the result a measurement",
+      "is exactly the move spec.py exists to refuse. width_m and height_m therefore",
+      "stay on their (weak) published source and say so."
+    ]
+  },
+
+  "formation": "Mc-Rc",
+
+  "_splits": [
+    "Two cars, and for once the split is not our arithmetic over a total - the ficha",
+    "publishes it per car. Seats: 24 each, stated. Weight: 26.200 kg (M) and 19.452",
+    "kg (R), stated, rounded to 26 and 19. Power: the whole 594 kW sits on the M and",
+    "none on the R, and that is not a judgement either - the axle arrangement",
+    "Bo'Bo'+2'2' says the M's bogies are driven and the R's are not.",
+    "",
+    "So car_totals here is checking arithmetic that a source already did. That is the",
+    "weakest this mechanism has ever had to work, and it is the right kind of weak."
+  ],
+
+  "car_totals": {
+    "seats": "payload_seated",
+    "kilowatts": "power_total_kw",
+    "tonnes": "weight_unit_t"
+  },
+
+  "cars": [
+    {"key": "s2ka_mot", "role": "Mc", "cab": true, "panto": true,  "reversed": false, "seats": 24, "tonnes": 26, "kilowatts": 594,
+     "note": "The motor car. Cab at the outer end, pantograph on the roof, both bogies driven."},
+    {"key": "s2ka_rem", "role": "Rc", "cab": true, "panto": false, "reversed": true,  "seats": 24, "tonnes": 19, "kilowatts": 0,
+     "note": "The trailer. Also a cab car - this is the thing that makes a 2000A look nothing like a 7000, because in a six-car train these cabs sit in the MIDDLE, facing each other. Modelled reversed so its cab points the other way."}
+  ]
+}
