@@ -191,6 +191,107 @@ def grid_placement(keys, cols=None):
     return {key: divmod(idx, cols) for idx, key in enumerate(keys)}
 
 
+def outline_cells(pixels, width, height, tile_px, colour,
+                  thickness=1, alpha_on=48):
+    """Ink a flat per-cell contour outward around the opaque silhouette.
+
+    Within each tile_px cell a transparent pixel within Chebyshev radius `thickness`
+    of an opaque one becomes `colour`; opaque pixels are never overwritten and the
+    neighbourhood is clamped to the cell (no cross-cell bleed).
+
+    Idempotent: a pixel already exactly `colour` is kept but never seeds a new ring,
+    so outline_cells(outline_cells(x)) == x. PRECONDITION: the caller must reserve
+    `colour` for the contour and not use it as a legitimate body colour - a body
+    pixel that happens to equal `colour` is preserved but will not seed.
+
+    A 3-tuple `colour` is taken as opaque (alpha 255). Returns a NEW list; `pixels`
+    is not mutated.
+    """
+    def _int(v):
+        return isinstance(v, int) and not isinstance(v, bool)
+
+    # Contract. makeobj cell addressing and the per-cell clamp both depend on it.
+    if not (_int(width) and _int(height) and width > 0 and height > 0):
+        raise ValueError("width and height must be positive integers")
+    if not (_int(tile_px) and tile_px > 0):
+        raise ValueError("tile_px must be a positive integer")
+    if width % tile_px or height % tile_px:
+        raise ValueError("width and height must be multiples of tile_px")
+    try:
+        count = len(pixels)
+    except TypeError:
+        raise ValueError("pixels must be a sized sequence") from None
+    if count != width * height:
+        raise ValueError("pixels has %d entries, expected width*height=%d"
+                         % (count, width * height))
+    if not (_int(thickness) and thickness >= 1):
+        raise ValueError("thickness must be an integer >= 1")
+    if not (_int(alpha_on) and 0 <= alpha_on <= 255):
+        raise ValueError("alpha_on must be an integer in 0..255")
+    try:
+        channels = tuple(colour)
+    except TypeError:
+        raise ValueError("colour must have 3 or 4 integer components in 0..255") from None
+    if (len(channels) not in (3, 4)
+            or not all(_int(c) and 0 <= c <= 255 for c in channels)):
+        raise ValueError("colour must have 3 or 4 integer components in 0..255")
+
+    colour = channels + (255,) if len(channels) == 3 else channels
+
+    def alpha(i):
+        p = pixels[i]
+        return p[3] if len(p) >= 4 else 255
+
+    def is_body(i):
+        # An opaque pixel seeds the contour, unless it is already the reserved ink:
+        # keeping a prior contour without re-seeding is what makes a re-run a no-op.
+        if alpha(i) < alpha_on:
+            return False
+        p = pixels[i]
+        return (p if len(p) >= 4 else (p[0], p[1], p[2], 255)) != colour
+
+    out = list(pixels)
+    cols = width // tile_px
+    rows = height // tile_px
+    for cr in range(rows):
+        for cc in range(cols):
+            x0, y0 = cc * tile_px, cr * tile_px
+            x1, y1 = x0 + tile_px, y0 + tile_px
+            for y in range(y0, y1):
+                for x in range(x0, x1):
+                    if alpha(y * width + x) >= alpha_on:
+                        continue                       # opaque: never overwrite
+                    hit = False
+                    for dy in range(-thickness, thickness + 1):
+                        ny = y + dy
+                        if ny < y0 or ny >= y1:
+                            continue
+                        for dx in range(-thickness, thickness + 1):
+                            nx = x + dx
+                            if nx < x0 or nx >= x1:
+                                continue
+                            if is_body(ny * width + nx):
+                                hit = True
+                                break
+                        if hit:
+                            break
+                    if hit:
+                        out[y * width + x] = colour
+    return out
+
+
+def add_outline_file(path, tile_px, colour, thickness=1, alpha_on=48):
+    """Read a finished sheet, add a flat per-cell contour, write it back in place.
+
+    Meant to run between the render and makeobj so the compiled .pak carries the
+    contour. Returns the (r, g, b) that was inked.
+    """
+    w, h, _a, px = read_png(path)
+    out = outline_cells(px, w, h, tile_px, colour, thickness, alpha_on)
+    write_png(path, w, h, out, has_alpha=True)
+    return tuple(colour[:3])
+
+
 def assemble(frames, tile_px, cols=None, out_path=None):
     """Lay rendered frames onto a tile grid.
 

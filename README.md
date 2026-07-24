@@ -205,7 +205,7 @@ tools/
   extract_dat_schema.py  re-derives the linter's key list from the engine
   run_tests.py         renders, compiles and runs the whole suite
 tests/
-  test_core.py         1,240 checks, no Blender needed
+  test_core.py         1,603 checks, no Blender needed
   test_templates.py    does the template name what the renderer actually reads?
   test_scenecheck.py   every rule, on a scene that trips it and one that does not
   test_consists.py     the engine's real coupling vocabulary, and the union
@@ -705,7 +705,7 @@ The full suite is **45 suites, all green** (`python tools/run_tests.py`), from t
 Blender-free core checks through the Blender renders to the headless game, including
 scenarios on a real **pak128**.
 
-* `core` — **1,417 checks pass** (`python tests/test_core.py`).
+* `core` — **1,603 checks pass** (`python tests/test_core.py`).
 * `variants`, `package`, `components` — **232 checks**, no Blender. Every rule is
   checked twice: on a case that trips it and one that must not.
 * `phase2` — inside Blender: the preview is byte-identical to the final render, a

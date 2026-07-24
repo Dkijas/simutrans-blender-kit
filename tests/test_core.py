@@ -393,6 +393,209 @@ def test_png_roundtrip_and_assembly():
             check("wrong-size frame rejected", True)
 
 
+def test_outline_cells():
+    """The flat contour's three load-bearing invariants, on a controlled image.
+
+    A 3x3 opaque block sits at the RIGHT edge of a two-cell sheet's LEFT cell, so
+    it also lets us prove the seam is respected.
+    """
+    tile = 6
+    W, H = 2 * tile, tile
+    T = (0, 0, 0, 0)
+    BODY = (200, 50, 50, 255)
+    OUTLINE = (22, 24, 28, 255)
+
+    px = [T] * (W * H)
+    block = [(x, y) for x in (3, 4, 5) for y in (2, 3, 4)]   # touches x=5 = left edge
+    for x, y in block:
+        px[y * W + x] = BODY
+
+    out = sheet.outline_cells(px, W, H, tile, OUTLINE)
+    idx = lambda x, y: y * W + x
+
+    # 1. a body pixel is NEVER overwritten - the palette-exact interior is safe
+    check("outline: body pixel untouched", out[idx(4, 3)] == BODY,
+          str(out[idx(4, 3)]))
+    # 2. a transparent pixel bordering the body, inside the cell, is inked
+    check("outline: border pixel inked", out[idx(2, 3)] == OUTLINE,
+          str(out[idx(2, 3)]))
+    # 3. the contour cannot bleed across the cell seam: x=6 is the first column of
+    #    the RIGHT cell, next to the block, and must stay transparent
+    check("outline: no bleed across the cell seam", out[idx(6, 3)] == T,
+          str(out[idx(6, 3)]))
+
+    # exactly ONE colour is introduced - the whole point over a Freestyle line
+    before = {p for p in px if p[3] > 0}
+    after = {p for p in out if p[3] > 0}
+    check("outline: exactly one colour added", after - before == {OUTLINE},
+          str(after - before))
+    # and the input list is left alone
+    check("outline: input not mutated", px[idx(2, 3)] == T)
+
+
+def test_outline_is_idempotent():
+    """Applying the same contour twice must equal applying it once.
+
+    The bug: a first pass inks opaque contour pixels, and a naive second pass reads
+    THOSE as silhouette and grows another ring (8 px -> 24). The fix keeps a prior
+    contour but does not let it seed, so the sheet is a fixed point.
+    """
+    tile = 8
+    W, H = 2 * tile, tile
+    T = (0, 0, 0, 0)
+    BODY = (200, 50, 50, 255)
+    INK = (22, 24, 28)
+
+    px = [T] * (W * H)
+    for x in range(2, 6):                       # a 4x4 body, clear of the seam
+        for y in range(2, 6):
+            px[y * W + x] = BODY
+
+    once = sheet.outline_cells(px, W, H, tile, INK)
+    twice = sheet.outline_cells(once, W, H, tile, INK)
+    check("outline: second application is identical to the first (t=1)", twice == once)
+    check("outline: a contour was actually drawn",
+          any(p == INK + (255,) for p in once))
+
+    # thickness=2: deterministic, still a fixed point, still no cross-cell bleed
+    o1 = sheet.outline_cells(px, W, H, tile, INK, thickness=2)
+    o1b = sheet.outline_cells(px, W, H, tile, INK, thickness=2)
+    o2 = sheet.outline_cells(o1, W, H, tile, INK, thickness=2)
+    check("outline t=2: deterministic", o1 == o1b)
+    check("outline t=2: idempotent", o2 == o1)
+    right_cell = [o1[y * W + x] for y in range(H) for x in range(tile, W)]
+    check("outline t=2: nothing crosses the seam into the right cell",
+          all(p == T for p in right_cell), str({p for p in right_cell if p != T}))
+
+    # a body pixel that is ITSELF the ink colour is kept, never grows a ring around
+    # it, and the sheet stays a fixed point - the collision case the design allows
+    coll = list(px)
+    coll[3 * W + 3] = INK + (255,)
+    c1 = sheet.outline_cells(coll, W, H, tile, INK)
+    check("outline: an ink-coloured body pixel is preserved",
+          c1[3 * W + 3] == INK + (255,))
+    check("outline: and re-inking is still a no-op",
+          sheet.outline_cells(c1, W, H, tile, INK) == c1)
+
+
+def test_outline_rgb_and_rgba_colour():
+    """A 3-tuple colour normalises to alpha 255; a 4-tuple is kept verbatim."""
+    tile = 6
+    W, H = tile, tile
+    T = (0, 0, 0, 0)
+    BODY = (200, 50, 50, 255)
+    px = [T] * (W * H)
+    px[3 * W + 3] = BODY
+
+    rgb = sheet.outline_cells(px, W, H, tile, (22, 24, 28))
+    check("outline: RGB colour is inked opaque", rgb[3 * W + 2] == (22, 24, 28, 255))
+
+    rgba = sheet.outline_cells(px, W, H, tile, (22, 24, 28, 200))
+    check("outline: RGBA colour is preserved", rgba[3 * W + 2] == (22, 24, 28, 200))
+
+
+def test_outline_validates_its_contract():
+    """Contract breaches must be a ValueError, not a silently wrong sheet."""
+    tile = 4
+    good = [(0, 0, 0, 0)] * (tile * tile)
+
+    def rejects(label, **kw):
+        args = dict(pixels=good, width=tile, height=tile, tile_px=tile,
+                    colour=(22, 24, 28), thickness=1, alpha_on=48)
+        args.update(kw)
+        try:
+            sheet.outline_cells(args["pixels"], args["width"], args["height"],
+                                args["tile_px"], args["colour"],
+                                thickness=args["thickness"], alpha_on=args["alpha_on"])
+            check(label, False, "no ValueError raised")
+        except ValueError:
+            check(label, True)
+
+    rejects("tile_px=0 refused", tile_px=0)
+    rejects("thickness=0 refused", thickness=0)
+    rejects("negative thickness refused", thickness=-1)
+    rejects("indivisible width refused", width=tile + 1,
+            pixels=[(0, 0, 0, 0)] * ((tile + 1) * tile))
+    rejects("wrong pixel count refused", pixels=good[:-1])
+    rejects("alpha_on above 255 refused", alpha_on=256)
+    rejects("alpha_on below 0 refused", alpha_on=-1)
+    rejects("2-component colour refused", colour=(22, 24))
+    rejects("5-component colour refused", colour=(22, 24, 28, 255, 0))
+    rejects("out-of-range colour channel refused", colour=(22, 24, 300))
+    rejects("negative colour channel refused", colour=(22, 24, -1))
+    rejects("non-integer colour channel refused", colour=(22, 24, 28.0))
+
+    # bool is an int subclass, so it slips past a bare isinstance(x, int)
+    rejects("boolean width refused", width=True)
+    rejects("boolean height refused", height=True)
+    rejects("boolean tile_px refused", tile_px=True)
+    rejects("boolean thickness refused", thickness=True)
+    rejects("boolean alpha_on refused", alpha_on=True)
+    rejects("boolean colour channel refused", colour=(22, 24, True))
+
+    # a colour that is not a 3/4-component collection is a ValueError, not a TypeError
+    rejects("colour=None refused", colour=None)
+    rejects("colour=22 (not a sequence) refused", colour=22)
+    # likewise pixels without len()
+    rejects("pixels=None refused", pixels=None)
+
+    # the happy path still returns a sheet of the right size, RGB and RGBA both
+    ok = sheet.outline_cells(good, tile, tile, tile, (22, 24, 28))
+    check("a valid RGB call still returns width*height pixels", len(ok) == tile * tile)
+    ok4 = sheet.outline_cells(good, tile, tile, tile, (22, 24, 28, 255))
+    check("a valid RGBA call still returns width*height pixels", len(ok4) == tile * tile)
+
+
+def test_add_outline_file_is_idempotent():
+    """The file path, decoded and compared as PIXELS (PNG bytes are not canonical)."""
+    tile = 8
+    W, H = 2 * tile, tile
+    T = (0, 0, 0, 0)
+    BODY = (200, 50, 50, 255)
+    px = [T] * (W * H)
+    for x in range(2, 6):
+        for y in range(2, 6):
+            px[y * W + x] = BODY
+
+    with tempfile.TemporaryDirectory() as tmp:
+        p = os.path.join(tmp, "sheet.png")
+        sheet.write_png(p, W, H, px, has_alpha=True)
+        sheet.add_outline_file(p, tile, (22, 24, 28))
+        _w, _h, _a, after_once = sheet.read_png(p)
+        sheet.add_outline_file(p, tile, (22, 24, 28))
+        _w, _h, _a, after_twice = sheet.read_png(p)
+        check("add_outline_file: a second pass changes no pixel",
+              after_twice == after_once)
+        check("add_outline_file: it did ink a contour",
+              any(q == (22, 24, 28, 255) for q in after_once))
+
+
+def test_toolchain_finds_makeobj_in_cmake_src_layout():
+    """find_makeobj must see the real CMake path build/src/makeobj/<exe>."""
+    from tools import toolchain
+
+    saved = {k: os.environ.get(k) for k in ("SIMUTRANS_MAKEOBJ", "SIMUTRANS_SRC")}
+    try:
+        os.environ.pop("SIMUTRANS_MAKEOBJ", None)
+        with tempfile.TemporaryDirectory() as root, \
+                tempfile.TemporaryDirectory() as game:
+            os.environ["SIMUTRANS_SRC"] = game
+            d = os.path.join(game, "build", "src", "makeobj")
+            os.makedirs(d)
+            exe_path = os.path.join(d, toolchain.exe("makeobj"))
+            with open(exe_path, "wb"):
+                pass
+            found = toolchain.find_makeobj(root)
+            check("find_makeobj returns the CMake src/makeobj binary",
+                  found == exe_path, "%r != %r" % (found, exe_path))
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
 # -------------------------------------------------------------------- datgen
 def test_image_block_and_dat():
     place = {"s": (0, 0), "w": (0, 1), "sw": (0, 2), "se": (0, 3)}

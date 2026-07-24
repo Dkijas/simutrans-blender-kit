@@ -49,6 +49,7 @@ def find_makeobj(root):
     return _first_file(
         os.path.join(root, "build", "tools", name),
         os.path.join(game, "build", "tools", name),
+        os.path.join(game, "build", "src", "makeobj", name),
         os.path.join(game, "build", name),
     ) or shutil.which(name)
 

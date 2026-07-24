@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.10.1 - 2026-07-25
+
+### Fixed
+
+- **The flat contour is now idempotent.** `outline_cells` (and `add_outline_file`)
+  read the opaque pixels of its own prior contour as silhouette and grew a fresh
+  ring on every call (8 px → 24). It now keeps a prior contour but never lets a
+  pixel that already equals the ink seed a new ring, so
+  `outline_cells(outline_cells(x)) == x`. This relies on the caller reserving the
+  ink colour: a body pixel that happens to equal it is preserved but will not seed.
+
+### Added
+
+- **Argument validation in `outline_cells`.** Sizes, `tile_px`, divisibility,
+  `len(pixels)`, `thickness`, `alpha_on` and the 3-/4-component `colour` are each
+  checked (booleans rejected, a non-collection `colour` is a `ValueError`, not a
+  `TypeError`), with regressions covering every case.
+- `toolchain.find_makeobj` also looks in the CMake `build/src/makeobj/` layout.
+
 ## 0.10.0
 
 0.9 got you a family. This gets you a *train* — and puts the scene back afterwards.
