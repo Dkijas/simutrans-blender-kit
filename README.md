@@ -701,7 +701,7 @@ cars, two liveries, two formations, a package.
 
 ## Status
 
-The full suite is **45 suites, all green** (`python tools/run_tests.py`), from the
+The full suite is **47 suites, all green** (`python tools/run_tests.py`), from the
 Blender-free core checks through the Blender renders to the headless game, including
 scenarios on a real **pak128**.
 
