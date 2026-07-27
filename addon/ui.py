@@ -26,14 +26,16 @@ from bpy.types import Operator, Panel, PropertyGroup
 
 try:
     from . import library, rig, template, translations, workflow
-    from ..core import (buildings, colors, components, consists, contact,
-                        document, factories, night, package, paksets,
-                        scenecheck, schema, sheet, templates, variants)
+    from ..core import (buildings, colorcheck, colors, components, consists,
+                        contact, directioncheck, directions, document, factories,
+                        night, package, paksets, scenecheck, schema, sheet,
+                        spritemetrics, templates, variants)
 except ImportError:                                   # running from a checkout
     from addon import library, rig, template, translations, workflow
-    from core import (buildings, colors, components, consists, contact,
-                      document, factories, night, package, paksets,
-                      scenecheck, schema, sheet, templates, variants)
+    from core import (buildings, colorcheck, colors, components, consists,
+                      contact, directioncheck, directions, document, factories,
+                      night, package, paksets, scenecheck, schema, sheet,
+                      spritemetrics, templates, variants)
 
 CTX = translations.CONTEXT
 
@@ -1140,6 +1142,55 @@ class SIMUTRANS_OT_check_colors(Operator):
         return {"FINISHED"}
 
 
+class SIMUTRANS_OT_quality_check(Operator):
+    bl_idname = "simutrans.quality_check"
+    bl_label = "QA Check Sheet"
+    bl_translation_context = CTX
+    bl_description = ("Run the per-direction and special-colour checks on the "
+                      "rendered sheet: dropped or mis-facing headings, opposite "
+                      "views that disagree, an off-centre body, and dead windows")
+
+    def execute(self, context):
+        p = context.scene.simutrans
+        out, why = _out_dir(p)
+        if out is None:
+            self.report({"ERROR"}, why)
+            return {"CANCELLED"}
+
+        path = os.path.join(out, "%s.png" % p.basename)
+        if not os.path.exists(path):
+            self.report({"ERROR"}, _("No sheet yet - render one first"))
+            return {"CANCELLED"}
+
+        w, h, alpha, px = sheet.read_png(path)
+        if not alpha:
+            self.report({"ERROR"}, _("The sheet has no alpha channel"))
+            return {"CANCELLED"}
+
+        tile = paksets.get(p.pakset).tile_px
+        cells = (w // tile) * (h // tile)
+        codes = (directions.codes_for(8) if cells >= 8
+                 else directions.codes_for(4) if cells >= 4
+                 else directions.DIR_CODES[:cells])
+
+        findings = []
+        try:
+            m = spritemetrics.measure(px, w, h, tile, codes, w // tile)
+            findings.extend(directioncheck.check(m, tile, expected_codes=codes))
+        except ValueError as e:
+            self.report({"ERROR"}, str(e))
+            return {"CANCELLED"}
+        findings.extend(colorcheck.check(px, w, h, tile))
+
+        for f in findings:
+            level = {scenecheck.ERROR: "ERROR",
+                     scenecheck.WARNING: "WARNING"}.get(f.level, "INFO")
+            self.report({level}, "%s: %s" % (f.code, f.message))
+        if not findings:
+            self.report({"INFO"}, _("QA clean - no findings"))
+        return {"CANCELLED"} if scenecheck.blocking(findings) else {"FINISHED"}
+
+
 class SIMUTRANS_OT_night_preview(Operator):
     bl_idname = "simutrans.night_preview"
     bl_label = "Night Preview"
@@ -1373,6 +1424,7 @@ class SIMUTRANS_PT_panel(Panel):
         acts.operator("simutrans.render_sheet", icon="RENDER_ANIMATION")
         acts.operator("simutrans.write_dat", icon="FILE_TEXT")
         acts.operator("simutrans.check_colors", icon="COLOR")
+        acts.operator("simutrans.quality_check", icon="CHECKMARK")
         acts.prop(p, "night_level")
         acts.operator("simutrans.night_preview", icon="LIGHT_SUN")
 
@@ -2386,6 +2438,7 @@ CLASSES = (SimutransProps, SIMUTRANS_OT_build_rig, SIMUTRANS_OT_create_template,
            SIMUTRANS_OT_setup_reference, SIMUTRANS_OT_validate,
            SIMUTRANS_OT_render_sheet,
            SIMUTRANS_OT_write_dat, SIMUTRANS_OT_check_colors,
+           SIMUTRANS_OT_quality_check,
            SIMUTRANS_OT_night_preview, SIMUTRANS_OT_apply_material,
            SIMUTRANS_OT_compile_pak,
            SIMUTRANS_OT_variant_add, SIMUTRANS_OT_variant_duplicate,

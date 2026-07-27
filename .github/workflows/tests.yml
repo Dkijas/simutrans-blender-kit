@@ -1,10 +1,11 @@
 name: tests
 
 # The full suite needs Blender, makeobj and a headless Simutrans, none of which a
-# standard runner has. This job runs the Blender-free half - the `core` suite,
-# ~970 checks of pure-stdlib Python (projection, colours, the .dat linter, schema
-# drift) - which is exactly the fast inner loop the README documents. It is enough
-# to catch a regression in the geometry or the linter on every push.
+# standard runner has. This job runs the Blender-free half - the `core` suite
+# (~970 checks of pure-stdlib Python: projection, colours, the .dat linter, schema
+# drift) plus the QA toolchain suites (sprite metrics, the per-direction, colour and
+# consist checks, and the Quality Gate). All are pure stdlib, so they run on a bare
+# runner and catch a regression in the geometry, the linter or the gate on every push.
 
 on:
   push:
@@ -28,5 +29,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Core suite (Blender-free)
-        run: python tools/run_tests.py core
+      - name: Core + QA suites (Blender-free)
+        run: >
+          python tools/run_tests.py core scenecheck spritemetrics
+          directioncheck colorcheck consistcheck qualitygate

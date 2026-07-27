@@ -186,6 +186,41 @@ def suite_scenecheck():
                 120, "scenecheck")
 
 
+def suite_spritemetrics():
+    """The sprite measuring tape: bbox, coverage and centroid from a literal grid."""
+    return _run([sys.executable, os.path.join("tests", "test_spritemetrics.py")], ROOT,
+                "SPRITEMETRICS_TESTS_OK", ("SPRITEMETRICS_TESTS_FAILED", "Traceback"),
+                120, "spritemetrics")
+
+
+def suite_directioncheck():
+    """The after-render per-direction check: every rule, tripped and not, plus real art."""
+    return _run([sys.executable, os.path.join("tests", "test_directioncheck.py")], ROOT,
+                "DIRECTIONCHECK_TESTS_OK", ("DIRECTIONCHECK_TESTS_FAILED", "Traceback"),
+                120, "directioncheck")
+
+
+def suite_colorcheck():
+    """Special-colour location + near-miss: fires on a dead window, silent on grey art."""
+    return _run([sys.executable, os.path.join("tests", "test_colorcheck.py")], ROOT,
+                "COLORCHECK_TESTS_OK", ("COLORCHECK_TESTS_FAILED", "Traceback"),
+                120, "colorcheck")
+
+
+def suite_consistcheck():
+    """Whole-unit joint geometry: body-vs-declared-length on the sheet, mixed lengths OK."""
+    return _run([sys.executable, os.path.join("tests", "test_consistcheck.py")], ROOT,
+                "CONSISTCHECK_TESTS_OK", ("CONSISTCHECK_TESTS_FAILED", "Traceback"),
+                120, "consistcheck")
+
+
+def suite_qualitygate():
+    """The one-verdict roll-up and the Sprite Studio manifest contract."""
+    return _run([sys.executable, os.path.join("tests", "test_qualitygate.py")], ROOT,
+                "QUALITYGATE_TESTS_OK", ("QUALITYGATE_TESTS_FAILED", "Traceback"),
+                120, "qualitygate")
+
+
 def suite_variants():
     """Variants: the axes the engine really has, stable keys, and migration."""
     return _run([sys.executable, os.path.join("tests", "test_variants.py")], ROOT,
@@ -568,6 +603,11 @@ SUITES = {
     "core": suite_core,
     "templates": suite_templates,
     "scenecheck": suite_scenecheck,
+    "spritemetrics": suite_spritemetrics,
+    "directioncheck": suite_directioncheck,
+    "colorcheck": suite_colorcheck,
+    "consistcheck": suite_consistcheck,
+    "qualitygate": suite_qualitygate,
     "variants": suite_variants,
     "package": suite_package,
     "components": suite_components,
@@ -615,7 +655,8 @@ SUITES = {
 }
 # Producers first, then the .pak they feed, then the game. The order IS the loop:
 # nothing downstream of "paks" can pass on art that this run did not render.
-ORDER = ("core", "templates", "scenecheck", "variants", "package",
+ORDER = ("core", "templates", "scenecheck", "spritemetrics", "directioncheck",
+         "colorcheck", "consistcheck", "qualitygate", "variants", "package",
          "components", "consists", "schema", "colours", "profile",
          # producers: the art and the .dat. "template" leads them - it is what
          # makes the scene the rest of them render.

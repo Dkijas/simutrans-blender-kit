@@ -224,6 +224,12 @@ SOURCE_STRINGS = (
     "Check Colours",
     "Scan the sheet for Simutrans' reserved colours - the ones the engine repaints "
     "in the company colour",
+    "QA Check Sheet",
+    "Run the per-direction and special-colour checks on the rendered sheet: dropped "
+    "or mis-facing headings, opposite views that disagree, an off-centre body, and "
+    "dead windows",
+    "The sheet has no alpha channel",
+    "QA clean - no findings",
     "Night Preview",
     "Show the sheet as the game will draw it after dark - the engine's own "
     "day-to-night colour swap, not a filter",
@@ -531,6 +537,15 @@ SPANISH = {
     "in the company colour":
         "Busca en la hoja los colores reservados de Simutrans: los que el motor "
         "repinta con el color de la empresa",
+    "QA Check Sheet": "Control de calidad de la hoja",
+    "Run the per-direction and special-colour checks on the rendered sheet: dropped "
+    "or mis-facing headings, opposite views that disagree, an off-centre body, and "
+    "dead windows":
+        "Pasa los controles por dirección y de colores especiales sobre la hoja "
+        "renderizada: direcciones perdidas o mal orientadas, vistas opuestas que no "
+        "concuerdan, cuerpo descentrado y ventanas muertas",
+    "The sheet has no alpha channel": "La hoja no tiene canal alfa",
+    "QA clean - no findings": "Control de calidad limpio: sin incidencias",
     "Night Preview": "Vista nocturna",
     "Show the sheet as the game will draw it after dark - the engine's own "
     "day-to-night colour swap, not a filter":
