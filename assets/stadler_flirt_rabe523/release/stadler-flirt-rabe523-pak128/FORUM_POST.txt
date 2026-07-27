@@ -1,0 +1,39 @@
+[Pak128] Stadler FLIRT RABe 523 — new four-car EMU
+
+[b]Stadler FLIRT RABe 523 for pak128 — first test release[/b]
+
+I have been working on a new four-car Stadler FLIRT for pak128, based on the SBB
+RABe 523.
+
+The complete unit was created using the Simutrans Blender Kit, including the 3D
+model, eight-direction renders, sprite sheets, dat files and final pak compilation.
+
+This first version includes:
+
+* a fixed four-car formation, assembled from one depot click;
+* 160 km/h maximum speed;
+* electric traction;
+* an articulated regional EMU configuration with a pantograph on the third car;
+* the SBB white/red livery with red doors and a red cab front.
+
+I have tested it in the current Simutrans nightly with pak128: one click on the cab
+car assembles the whole unit in order (A–B–C–D), the engine agrees it is electric,
+it only runs under catenary, and it moves on pak128 rail — checked on a straight run
+and a diagonal. The couplings make an invalid consist (an intermediate at the head,
+wrong order, a foreign vehicle inside) impossible.
+
+The pak and the full source package (dat files, sprite sheets, Blender project,
+screenshots, checksums) are attached below. A screenshot is included at the top.
+
+This is a first version, so a few honest notes: the cost and running cost are still
+provisional placeholders and need balancing against pak128's own EMUs, and the nose
+is a stylised 128 px approximation rather than a panel-exact model.
+
+Feedback is very welcome, especially about:
+
+* alignment and proportions;
+* balancing (cost, capacity, weight);
+* the SBB livery;
+* which FLIRT operator or variant I should make next.
+
+Please try the pak and tell me what you think.

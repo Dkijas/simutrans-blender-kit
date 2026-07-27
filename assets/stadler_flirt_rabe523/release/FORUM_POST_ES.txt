@@ -1,0 +1,42 @@
+[Pak128] Stadler FLIRT RABe 523 — nueva unidad de cuatro coches
+
+[b]Stadler FLIRT RABe 523 para pak128 — primera versión de prueba[/b]
+
+He estado trabajando en un nuevo Stadler FLIRT de cuatro coches para pak128, basado
+en el SBB RABe 523.
+
+La unidad completa se ha creado con el Simutrans Blender Kit: el modelo 3D, los
+renders en ocho direcciones, las hojas de sprites, los ficheros dat y la compilación
+final del pak.
+
+Esta primera versión incluye:
+
+* una composición fija de cuatro coches, montada con un solo clic en el depósito;
+* velocidad máxima de 160 km/h;
+* tracción eléctrica;
+* configuración de EMU regional articulado, con pantógrafo en el tercer coche;
+* la librea SBB blanca/roja, con puertas rojas y frente de cabina rojo.
+
+La he probado en el nightly actual de Simutrans con pak128: un clic en el coche
+cabina monta la unidad completa en orden (A–B–C–D), el motor confirma que es
+eléctrica, solo circula con catenaria, y se mueve por vía pak128 — comprobado en
+recta y en diagonal. Las restricciones de acoplamiento hacen imposible una
+composición inválida (un coche intermedio en cabeza, orden incorrecto o un vehículo
+ajeno dentro).
+
+Adjunto el pak y el paquete completo de fuentes (ficheros dat, hojas de sprites,
+proyecto de Blender, capturas, sumas de verificación). Arriba incluyo una captura.
+
+Es una primera versión, así que un par de notas honestas: el coste y el
+mantenimiento son todavía valores provisionales y hay que equilibrarlos con los EMU
+propios de pak128, y el morro es una aproximación estilizada a 128 px, no un modelo
+exacto panel a panel.
+
+Se agradecen mucho los comentarios, sobre todo sobre:
+
+* alineación y proporciones;
+* equilibrado (coste, capacidad, peso);
+* la librea SBB;
+* qué operador o variante del FLIRT debería hacer a continuación.
+
+Probad el pak y decidme qué os parece.

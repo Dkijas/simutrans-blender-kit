@@ -1,0 +1,33 @@
+# File inventory - stadler-flirt-rabe523-pak128 v0.1.0
+
+INVENTORY.md                                         56 bytes
+SBB_FLIRT_RABe523.pak                             26755 bytes
+SHA256SUMS.txt                                      744 bytes
+blender/build.py                                   7777 bytes
+blender/cab_a.blend                              144362 bytes
+blender/cab_d.blend                              153492 bytes
+blender/flirt.py                                  19858 bytes
+blender/int_b.blend                              127363 bytes
+blender/int_c.blend                              132708 bytes
+blender/spec.json                                  3500 bytes
+dat/cab_a.dat                                      1302 bytes
+dat/cab_d.dat                                      1302 bytes
+dat/int_b.dat                                      1314 bytes
+dat/int_c.dat                                      1314 bytes
+screenshots/flirt_depot.png                      215799 bytes
+screenshots/flirt_diagonal.png                   259260 bytes
+screenshots/flirt_forum_header.png               146907 bytes
+screenshots/flirt_line.png                       267125 bytes
+screenshots/flirt_station.png                    268329 bytes
+sprites/cab_a.png                                  7488 bytes
+sprites/cab_d.png                                  7460 bytes
+sprites/int_b.png                                  5843 bytes
+sprites/int_c.png                                  6258 bytes
+textures/flirt_cab_a.png                           2697 bytes
+textures/flirt_cab_a_mask.png                      1907 bytes
+textures/flirt_cab_d.png                           2697 bytes
+textures/flirt_cab_d_mask.png                      1907 bytes
+textures/flirt_int_b.png                           2811 bytes
+textures/flirt_int_b_mask.png                      1927 bytes
+textures/flirt_int_c.png                           2811 bytes
+textures/flirt_int_c_mask.png                      1927 bytes

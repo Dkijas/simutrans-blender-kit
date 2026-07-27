@@ -1,0 +1,17 @@
+Stadler FLIRT RABe 523 (SBB) for pak128
+=======================================
+
+Model, SBB livery and game data: (c) victor_18993.
+Released for use with pak128 under the same terms as the pakset's own art
+(Artistic Licence / pak128 licensing). You may use, modify and redistribute it
+within Simutrans paksets with attribution to the author.
+
+Built with the Simutrans Blender Kit (https://github.com/Dkijas/simutrans-blender-kit),
+which is MIT-licensed. The kit is a tool; this artwork is the author's own.
+
+No third-party textures are included. Photographs of the real RABe 523 were used
+only as visual reference for proportions and colour; none are redistributed here.
+
+The name "Stadler", "FLIRT", "SBB CFF FFS" and "RABe 523" refer to the real
+vehicle for identification only; this is a fan-made depiction, not an official or
+endorsed product.

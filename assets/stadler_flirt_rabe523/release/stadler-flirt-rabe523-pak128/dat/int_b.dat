@@ -1,0 +1,42 @@
+obj=vehicle
+name=SBB_FLIRT_RABe523_B
+copyright=victor_18993
+waytype=track
+
+# --- economy -------------------------------------------------------------
+# cost/runningcost are in cents; runningcost is per km.
+# Omit intro_year and you silently get the engine default.
+cost=400000
+runningcost=40
+intro_year=2004
+retire_year=2999
+
+# --- physics -------------------------------------------------------------
+# engine_type: steam|diesel|electric|bio|sail|hydrogene|fuel_cell|battery
+# speed km/h, power kW (0 = unpowered wagon), gear % (100 = neutral),
+# weight tonnes (empty), length in 1/16 of a tile (OBJECT_OFFSET_STEPS=16).
+engine_type=electric
+speed=160
+power=0
+gear=100
+weight=26
+length=8
+
+# --- payload -------------------------------------------------------------
+# freight: None|Passagiere|Post|<goods name>
+freight=Passagiere
+payload=50
+
+# --- coupling ------------------------------------------------------------
+Constraint[Prev][0]=SBB_FLIRT_RABe523_A
+Constraint[Next][0]=SBB_FLIRT_RABe523_C
+
+# --- graphics (generated - do not hand-edit) -----------------------------
+EmptyImage[s]=int_b.0.0
+EmptyImage[w]=int_b.0.1
+EmptyImage[sw]=int_b.0.2
+EmptyImage[se]=int_b.0.3
+EmptyImage[n]=int_b.1.0
+EmptyImage[e]=int_b.1.1
+EmptyImage[ne]=int_b.1.2
+EmptyImage[nw]=int_b.1.3

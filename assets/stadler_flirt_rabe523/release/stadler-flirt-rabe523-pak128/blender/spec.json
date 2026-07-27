@@ -1,0 +1,101 @@
+{
+  "name": "SBB_FLIRT_RABe523",
+  "pakset": "pak128",
+
+  "facts": {
+    "speed": {
+      "value": 160,
+      "kind": "measured",
+      "source": "https://www.sbb.ch/en/travel-information/services-on-train/our-trains/flirt.html - 160 km/h"
+    },
+    "power_total_kw": {
+      "value": 2000,
+      "kind": "measured",
+      "source": "Stadler FLIRT first generation, SBB RABe 523 - continuous rating ~2000 kW",
+      "note": "brief gives ~2000 kW for the Swiss first-generation family"
+    },
+    "weight_total_t": {
+      "value": 120,
+      "kind": "measured",
+      "source": "brief: total weight around 120 t for the four-car RABe 523"
+    },
+    "capacity_total": {
+      "value": 184,
+      "kind": "measured",
+      "source": "SBB RABe 523 four-car seated capacity ~184",
+      "note": "in the 160-220 band the brief allows; carried as total passengers"
+    },
+    "intro_year": {
+      "value": 2004,
+      "kind": "measured",
+      "source": "https://www.sbb.ch/en/.../flirt.html - FLIRT in service since 2004"
+    },
+    "length_total_m": {
+      "value": 74.1,
+      "kind": "measured",
+      "source": "brief: four-car RABe 523 ~74.1 m (SBB page gives 75-105 m across versions)"
+    },
+    "height_m": {
+      "value": 4.15,
+      "kind": "measured",
+      "source": "brief: approx 4.15 m"
+    },
+    "width_m": {
+      "value": 2.88,
+      "kind": "measured",
+      "source": "brief: approx 2.88 m"
+    },
+
+    "power_per_cab_car_kw": {
+      "value": 1000,
+      "kind": "derived",
+      "formula": "power_total_kw / 2 powered cab cars = 2000 / 2",
+      "source": "power_total_kw",
+      "note": "FLIRT traction is on the two end (cab) power bogies; intermediates unpowered. Approximate split."
+    },
+    "length_carunits": {
+      "value": 8,
+      "kind": "derived",
+      "formula": "every car the same length so every joint (L_prev - L_this)/2 is zero - see core/convoy.py and civia_465",
+      "source": "simconvoi.cc + vehicle_base.cc",
+      "note": "NOT 'pak128 always uses 8'; it is that mixing lengths in one convoy opens the joints, and no pak128 train does it."
+    },
+
+    "window_colour": {
+      "value": "#57656F",
+      "kind": "engine",
+      "source": "display/simgraph16.cc display_day_lights[0] (colors.WINDOW_DARK) -> warm yellow at night",
+      "note": "reused via core.colors, not hardcoded"
+    },
+    "headlight_colour": {
+      "value": "#E3E3FF",
+      "kind": "engine",
+      "source": "display/simgraph16.cc (colors.HEADLIGHT) -> yellow-white at night"
+    },
+    "taillight_colour": {
+      "value": "engine LAMP_RED",
+      "kind": "engine",
+      "source": "core.colors.LAMP_RED - red day and night"
+    },
+
+    "cost": {
+      "value": 2000000,
+      "kind": "provisional",
+      "source": "a placeholder in cents. To be balanced against pak128's own 2004-2010 EMUs (tools/measure_pakset.py + running game) before release."
+    },
+    "runningcost": {
+      "value": 200,
+      "kind": "provisional",
+      "source": "a placeholder per km. Same status as cost."
+    }
+  },
+
+  "cars": [
+    {"key": "cab_a", "role": "SBB_FLIRT_RABe523_A", "cab": true,  "panto": false, "reversed": false},
+    {"key": "int_b", "role": "SBB_FLIRT_RABe523_B", "cab": false, "panto": false, "reversed": false},
+    {"key": "int_c", "role": "SBB_FLIRT_RABe523_C", "cab": false, "panto": true,  "reversed": false},
+    {"key": "cab_d", "role": "SBB_FLIRT_RABe523_D", "cab": true,  "panto": false, "reversed": true}
+  ],
+
+  "consist_name": "Stadler FLIRT RABe 523 (SBB)"
+}
