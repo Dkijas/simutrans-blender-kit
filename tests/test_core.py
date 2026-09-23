@@ -326,6 +326,158 @@ def _write_indexed_png(path, width, height, depth, palette, indices, trns=None):
         f.write(chunk(b"IEND", b""))
 
 
+def _spec_paeth(a, b, c):
+    """The Paeth predictor exactly as the PNG specification writes it (W3C PNG, 9.4):
+    on a tie the order is left (a), then above (b), then upper-left (c)."""
+    p = a + b - c
+    pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+    if pa <= pb and pa <= pc:
+        return a
+    if pb <= pc:
+        return b
+    return c
+
+
+def _write_filtered_png(path, width, height, ctype, depth, raw_rows, filters, palette=None):
+    """Hand-build a PNG whose scanlines use the given filter types (0..4).
+
+    raw_rows are the UNFILTERED scanline bytes. Encoding filters them from those
+    bytes with the specification's predictors, so a correct decoder must give the
+    very same bytes back - the expected value never comes from a decoder."""
+    import struct
+    import zlib
+
+    bpp = max(1, {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}[ctype] * depth // 8)
+    out = bytearray()
+    prev = bytes(len(raw_rows[0]))
+    for row, f in zip(raw_rows, filters):
+        out.append(f)
+        for i, x in enumerate(row):
+            a = row[i - bpp] if i >= bpp else 0
+            b = prev[i]
+            c = prev[i - bpp] if i >= bpp else 0
+            pred = (0, a, b, (a + b) >> 1, _spec_paeth(a, b, c))[f]
+            out.append((x - pred) & 0xFF)
+        prev = row
+
+    def chunk(tag, body):
+        return (struct.pack(">I", len(body)) + tag + body
+                + struct.pack(">I", zlib.crc32(tag + body) & 0xFFFFFFFF))
+
+    with open(path, "wb") as fh:
+        fh.write(b"\x89PNG\r\n\x1a\n")
+        fh.write(chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, depth, ctype, 0, 0, 0)))
+        if palette:
+            fh.write(chunk(b"PLTE", b"".join(bytes(c) for c in palette)))
+        fh.write(chunk(b"IDAT", zlib.compress(bytes(out), 9)))
+        fh.write(chunk(b"IEND", b""))
+
+
+def test_png_paeth_ties_follow_the_spec():
+    """Paeth breaks a distance tie by POSITION - left, then above, then upper-left -
+    never by the predictor's value. A reader that picked the smaller value decoded
+    Blender's 2x renders wrong on 1.7 % of their pixels (a stripe pixel came back as
+    6084A8 instead of the player colour 6084A7, and the error ran on along the row).
+
+    Greyscale 8-bit, one byte per pixel, so every a, b, c is a whole pixel (a = left in
+    the same row, b = above, c = above-left). All three rows are Paeth-filtered:
+      row 1 x=2: a=19  b=22 c=20  -> pb == pc < pa: the spec takes b (22), not c (20)
+      row 1 x=6: a=213 b=60 c=111 -> pa == pc < pb: the spec takes a (213), not c (111)
+      row 2 x=4: a=35  b=50 c=40  -> pb == pc < pa: the spec takes b (50), not c (40)
+      row 1 x=4: a=40  b=30 c=35  -> c wins outright (pc = 0)
+      row 1 x=8: a=b=c=9          -> the only possible three-way tie: all agree
+    plus the first pixel of each row (a = c = 0) and a Paeth first scanline (b = c = 0).
+    (A pa == pb tie below pc needs a == b, so it can never pick a different value.)"""
+    raw = [bytes([7, 20, 22, 35, 30, 111, 60, 9, 9, 200]),     # Paeth on the first scanline
+           bytes([3, 19, 25, 40, 50, 213, 70, 9, 90, 1]),
+           bytes([99, 18, 18, 35, 250, 0, 255, 128, 127, 3])]
+    # the fixture must contain ties the defective rule got wrong, or it tests nothing
+    by_value = lambda a, b, c: min((abs(b - c), a), (abs(a - c), b), (abs(a + b - 2 * c), c))[1]
+    meets = 0
+    for y in (1, 2):
+        for i in range(1, len(raw[y])):
+            a, b, c = raw[y][i - 1], raw[y - 1][i], raw[y - 1][i - 1]
+            meets += _spec_paeth(a, b, c) != by_value(a, b, c)
+    check("paeth fixture meets ties where value order and position order differ", meets >= 3,
+          "%d" % meets)
+    with tempfile.TemporaryDirectory() as tmp:
+        p = os.path.join(tmp, "paeth_ties.png")
+        _write_filtered_png(p, 10, 3, 0, 8, raw, [4, 4, 4])
+        w, h, _alpha, px = sheet.read_png(p)
+        want = [(v, v, v) for row in raw for v in row]
+        check("paeth ties: size", (w, h) == (10, 3))
+        check("paeth ties: every byte decodes to the value that was encoded", px == want,
+              "first difference at pixel %s" % next((i for i, (g, e) in enumerate(zip(px, want))
+                                                     if g != e), None))
+
+
+def test_png_every_filter_every_supported_mode():
+    """Every row filter (None, Sub, Up, Average, Paeth) in every colour type and bit
+    depth read_png claims, on data chosen to be full of predictor ties (few distinct
+    byte values). The expected pixels come from the encoded bytes through read_png's
+    documented representation - sub-byte samples scaled to 0..255, the high byte of a
+    16-bit sample, palette entries for indexed images - never from a decoder."""
+    import random
+    rng = random.Random(1515)
+    # a narrow run of neighbouring byte values makes Paeth ties common; each mode's
+    # fixture is also required below to contain ties that the value-ordered rule
+    # would break the wrong way, so every mode is a detector, not only a smoke test
+    values = tuple(range(40, 52))
+    by_value = lambda a, b, c: min((abs(b - c), a), (abs(a - c), b), (abs(a + b - 2 * c), c))[1]
+    modes = [(0, 1), (0, 2), (0, 4), (0, 8), (0, 16), (2, 8), (2, 16), (3, 1), (3, 2), (3, 4),
+             (3, 8), (4, 8), (4, 16), (6, 8), (6, 16)]
+    width, height = 13, 10                      # odd width: a partly used last byte
+    with tempfile.TemporaryDirectory() as tmp:
+        for ctype, depth in modes:
+            nch = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}[ctype]
+            per_sample = max(1, depth // 8)
+            stride = (width * nch * depth + 7) // 8
+            palette = None
+            if ctype == 3:
+                palette = [(i * 37 % 256, i * 91 % 256, i * 13 % 256) for i in range(1 << depth)]
+            rows = [bytearray(rng.choice(values) for _ in range(stride)) for _y in range(height)]
+            filters = [y % 5 for y in range(height)]
+            bpp = max(1, nch * depth // 8)
+            # plant one pb == pc tie in the Paeth row 4 (any byte is valid data in every
+            # mode): c = 0x40 above-left, b = 0xC0 above, a = 0x00 left -> the spec takes
+            # 0xC0, value order would take 0x40; the 0x80 difference is the byte's TOP bit,
+            # so it lands on a real pixel even at 1 bit per pixel, never on row padding
+            rows[3][0], rows[3][bpp], rows[4][0] = 0x40, 0xC0, 0x00
+            rows = [bytes(r) for r in rows]
+            divergent = sum(
+                1 for y in range(1, height) if filters[y] == 4 for i in range(bpp, stride)
+                if _spec_paeth(rows[y][i - bpp], rows[y - 1][i], rows[y - 1][i - bpp])
+                != by_value(rows[y][i - bpp], rows[y - 1][i], rows[y - 1][i - bpp]))
+            check("colour type %d, %d bit: fixture meets value-vs-position Paeth ties"
+                  % (ctype, depth), divergent > 0, "%d" % divergent)
+            p = os.path.join(tmp, "m%d_%d.png" % (ctype, depth))
+            _write_filtered_png(p, width, height, ctype, depth, rows, filters, palette)
+            want = []
+            for row in rows:
+                samples = []
+                for s in range(width * nch):
+                    if depth >= 8:
+                        samples.append(row[s * per_sample])
+                    else:
+                        per_byte = 8 // depth
+                        v = (row[s // per_byte] >> (8 - depth * (s % per_byte + 1))) & ((1 << depth) - 1)
+                        samples.append(v if ctype == 3 else v * (255 // ((1 << depth) - 1)))
+                for x in range(width):
+                    t = samples[x * nch:(x + 1) * nch]
+                    if ctype == 3:
+                        want.append(palette[t[0]])
+                    elif ctype == 0:
+                        want.append((t[0], t[0], t[0]))
+                    elif ctype == 4:
+                        want.append((t[0], t[0], t[0], t[1]))
+                    else:
+                        want.append(tuple(t))
+            _w, _h, _a, px = sheet.read_png(p)
+            check("all five filters, colour type %d, %d bit" % (ctype, depth), px == want,
+                  "first difference at pixel %s" % next((i for i, (g, e) in enumerate(zip(px, want))
+                                                         if g != e), None))
+
+
 def test_reads_paletted_png():
     """pak128's marker.png is a 2-bit indexed PNG. If we cannot read that, we
     cannot even look at the artwork we are supposed to be compatible with."""

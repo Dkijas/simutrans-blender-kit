@@ -24,7 +24,18 @@ cells by hand - which is the single most error-prone step of the whole pipeline.
 import struct
 import zlib
 
-_PAETH = lambda a, b, c: min((abs(b - c), a), (abs(a - c), b), (abs(a + b - 2 * c), c))[1]
+def _PAETH(a, b, c):
+    """The PNG Paeth predictor (W3C PNG, 9.4). A tie goes to the neighbour that comes
+    first in the order left (a), above (b), upper-left (c) - by POSITION, not by value.
+    Taking min() over (distance, value) pairs broke ties by the smaller value instead,
+    which decoded a 2x Blender render wrong on 1.7 % of its pixels."""
+    p = a + b - c
+    pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+    if pa <= pb and pa <= pc:
+        return a
+    if pb <= pc:
+        return b
+    return c
 
 
 _SAMPLES = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}   # channels per colour type
